@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User & Profile ───────────────────────────────────────────────
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  location    String?
+  role        String   @default("Student")
+  avatar      String?
+  memberSince String?
+
+  // Exam Focus
+  primaryExam   String?
+  secondaryExam String?
+  targetYear    String?
+  currentStage  String?
+  language      String?
+  studyTime     String?
+
+  // Study Preferences
+  preferredTime  String?
+  hoursPerDay    String?
+  learningMode   String?
+  weekendStudy   String?
+
+  // Subscription
+  plan       String   @default("free")
+  planExpiry DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  exams          Exam[]
+  upcomingExams  UpcomingExam[]
+  reflections    Reflection[]
+  documents      Document[]
+  goals          Goal[]
+  calendarEvents CalendarEvent[]
+  reminders      Reminder[]
+  notifications  Notification[]
+  devices        Device[]
+  settings       UserSettings?
+}
+
+model UserSettings {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  user       User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Notifications
+  emailNotifications   Boolean @default(true)
+  pushNotifications    Boolean @default(true)
+  examReminders        Boolean @default(true)
+  goalReminders        Boolean @default(true)
+  weeklyReport         Boolean @default(true)
+  newFeatureAlerts     Boolean @default(true)
+  marketingEmails      Boolean @default(false)
+
+  // App Preferences
+  theme         String @default("light")
+  accentColor   String @default("emerald")
+  language      String @default("en")
+  dateFormat    String @default("DD/MM/YYYY")
+  weekStart     String @default("monday")
+  timeFormat    String @default("12h")
+
+  // Privacy
+  privacyMode   Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Exam History ─────────────────────────────────────────────────
+
+model Exam {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  org       String?
+  category  String   // "Banking", "SSC", "UPSC", etc.
+  stage     String   // "Prelims", "Mains", "Interview", "Final"
+  examDate  DateTime
+  attempt   Int      @default(1)
+
+  score     Float
+  maxScore  Float
+  cutoff    Float
+  cutoffGap Float?
+  result    String   // "Qualified", "Not Qualified", "Pending"
+
+  rank      Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sectionalScores SectionalScore[]
+  reflection      Reflection?
+}
+
+model SectionalScore {
+  id     String @id @default(cuid())
+  examId String
+  exam   Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  section String
+  score   Float
+  max     Float
+
+  createdAt DateTime @default(now())
+}
+
+// ─── Upcoming Exams ───────────────────────────────────────────────
+
+model UpcomingExam {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name          String
+  org           String?
+  priority      String   @default("Medium") // "High", "Medium", "Low"
+  examDate      DateTime
+  daysLeft      Int?
+
+  // Tracking
+  admitCard     Boolean  @default(false)
+  applicationStatus String @default("not_started") // "completed", "in_progress", "not_started"
+  hasReflection  Boolean  @default(false)
+  hasSyllabus    Boolean  @default(false)
+  reminderSet    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Reflections ──────────────────────────────────────────────────
+
+model Reflection {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId    String?  @unique
+  exam      Exam?    @relation(fields: [examId], references: [id], onDelete: SetNull)
+
+  examName  String
+  examDate  DateTime?
+  score     Float?
+  cutoff    Float?
+  gap       Float?
+  result    String?
+
+  // Exam Experience
+  difficulty     String?   // "Easy", "Moderate", "Hard", "Very Hard"
+  confidence     Int?      // 0-100
+  emotionalState String?   // "Confident", "Anxious", "Neutral", "Frustrated"
+
+  // Tags (comma-separated)
+  mistakeTags   String?   // "Time Management,Concept Gap,Silly Mistakes,..."
+  strengthTags  String?
+
+  // Written sections
+  whatWentWrong  String?
+  whatWentWell   String?
+  biggestLesson  String?
+  actionPlan     String?
+
+  // Next attempt goal
+  targetScore    Float?
+  goalDescription String?
+
+  // Reminder
+  reminderType   String?
+  reminderDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sections ReflectionSection[]
+}
+
+model ReflectionSection {
+  id          String     @id @default(cuid())
+  reflectionId String
+  reflection  Reflection @relation(fields: [reflectionId], references: [id], onDelete: Cascade)
+
+  section     String
+  score       Float?
+  strength    String?
+  weakness    String?
+  actionPlan  String?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── Documents ────────────────────────────────────────────────────
+
+model Document {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  note        String?
+  examName    String?
+  category    String   // "Scorecard", "Admit Card", "Result", "Question Paper", "Answer Key", "Syllabus", "Notes", "Misc"
+  fileUrl     String?
+  fileSize    Int?     // bytes
+  year        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Goals & Plans ────────────────────────────────────────────────
+
+model Goal {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  priority  String   @default("Medium") // "High", "Medium", "Low"
+  linkedExam String?
+  subject   String?
+  dueDate   DateTime?
+  status    String   @default("active") // "active", "completed", "overdue"
+  progress  Int      @default(0) // 0-100
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  completedAt DateTime?
+}
+
+// ─── Calendar Events ──────────────────────────────────────────────
+
+model CalendarEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      String   // "exam", "goal", "deadline", "reflection", "reminder"
+  label     String
+  date      DateTime
+  time      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Reminders ────────────────────────────────────────────────────
+
+model Reminder {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name      String
+  text      String?
+  date      DateTime
+  isRead    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Notifications ────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  message   String?
+  type      String   @default("info") // "info", "success", "warning", "error"
+  isRead    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Devices (for sign-out) ───────────────────────────────────────
+
+model Device {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  device     String
+  location   String?
+  isCurrent  Boolean  @default(false)
+  lastActive DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Study Streak ─────────────────────────────────────────────────
+
+model StudyStreak {
+  id             String   @id @default(cuid())
+  userId         String   @unique
+  currentStreak  Int      @default(0)
+  longestStreak  Int      @default(0)
+  daysThisMonth  Int      @default(0)
+  lastStudyDate  DateTime?
+  weekDots       String   @default("") // "1,0,1,1,0,1,1" for 7 days
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
