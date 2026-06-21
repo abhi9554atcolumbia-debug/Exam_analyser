@@ -25,6 +25,13 @@ import {
   X,
   File,
   ArrowUpDown,
+  FileSpreadsheet,
+  FileCheck,
+  FileKey,
+  BookOpen,
+  StickyNote,
+  Paperclip,
+  PieChart,
 } from 'lucide-react';
 import {
   getDocuments,
@@ -36,7 +43,7 @@ import {
   type DocumentStats as DocStats,
 } from '@/lib/api';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -44,6 +51,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -85,17 +93,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DonutChart } from '@/components/charts/DonutChart';
 
 // ── Constants ────────────────────────────────────────────────
-const CATEGORIES = [
-  { label: 'Scorecard', icon: '📊' },
-  { label: 'Admit Card', icon: '🎫' },
-  { label: 'Result', icon: '📋' },
-  { label: 'Question Paper', icon: '📝' },
-  { label: 'Answer Key', icon: '🔑' },
-  { label: 'Syllabus', icon: '📚' },
-  { label: 'Notes', icon: '🗒️' },
-  { label: 'Misc', icon: '📎' },
+const CATEGORIES: { label: string; icon: React.ElementType; color: string; darkColor: string }[] = [
+  { label: 'Scorecard', icon: FileCheck, color: 'text-emerald-600 bg-emerald-100', darkColor: 'dark:text-emerald-400 dark:bg-emerald-900/50' },
+  { label: 'Admit Card', icon: FileSpreadsheet, color: 'text-blue-600 bg-blue-100', darkColor: 'dark:text-blue-400 dark:bg-blue-900/50' },
+  { label: 'Result', icon: FileText, color: 'text-teal-600 bg-teal-100', darkColor: 'dark:text-teal-400 dark:bg-teal-900/50' },
+  { label: 'Question Paper', icon: FileText, color: 'text-amber-600 bg-amber-100', darkColor: 'dark:text-amber-400 dark:bg-amber-900/50' },
+  { label: 'Answer Key', icon: FileKey, color: 'text-purple-600 bg-purple-100', darkColor: 'dark:text-purple-400 dark:bg-purple-900/50' },
+  { label: 'Syllabus', icon: BookOpen, color: 'text-orange-600 bg-orange-100', darkColor: 'dark:text-orange-400 dark:bg-orange-900/50' },
+  { label: 'Notes', icon: StickyNote, color: 'text-rose-600 bg-rose-100', darkColor: 'dark:text-rose-400 dark:bg-rose-900/50' },
+  { label: 'Misc', icon: Paperclip, color: 'text-slate-600 bg-slate-100', darkColor: 'dark:text-slate-400 dark:bg-slate-900/50' },
 ] as const;
 
 const CATEGORY_OPTIONS = CATEGORIES.map((c) => c.label);
@@ -111,6 +120,8 @@ const SORT_OPTIONS = [
 
 const PAGE_SIZE = 10;
 const TOTAL_STORAGE_GB = 10;
+
+const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#f97316', '#ec4899', '#64748b'];
 
 // ── Utilities ────────────────────────────────────────────────
 function formatFileSize(bytes: number | null): string {
@@ -135,183 +146,174 @@ function formatDate(dateStr: string): string {
   }
 }
 
-function getCategoryIcon(category: string): string {
-  return CATEGORIES.find((c) => c.label === category)?.icon ?? '📎';
+function getCategoryConfig(category: string) {
+  return CATEGORIES.find((c) => c.label === category) ?? CATEGORIES[7];
 }
 
-function getCategoryBadgeVariant(
-  category: string
-): 'default' | 'secondary' | 'outline' | 'destructive' {
-  const map: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
-    Scorecard: 'default',
-    'Admit Card': 'secondary',
-    Result: 'default',
-    'Question Paper': 'outline',
-    'Answer Key': 'outline',
-    Syllabus: 'secondary',
-    Notes: 'outline',
-    Misc: 'secondary',
-  };
-  return map[category] ?? 'secondary';
+function getCategoryBadgeClasses(category: string) {
+  const cfg = getCategoryConfig(category);
+  return { cls: cn(cfg.color, cfg.darkColor), icon: cfg.icon };
 }
 
-// ── Upload Form Sub-component ────────────────────────────────
-function UploadForm({
-  onUpload,
-  onCancel,
-  isPending,
+// ── Create Document Dialog ───────────────────────────────────
+function CreateDocumentDialog({
+  open,
+  onOpenChange,
+  onSuccess,
 }: {
-  onUpload: (data: {
-    name: string;
-    category: string;
-    examName?: string;
-    year?: string;
-    note?: string;
-    fileSize?: number;
-  }) => void;
-  onCancel?: () => void;
-  isPending: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
 }) {
+  const queryClient = useQueryClient();
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [examName, setExamName] = useState('');
   const [year, setYear] = useState('');
   const [note, setNote] = useState('');
-  const [fileName, setFileName] = useState('');
-  const [fileSize, setFileSize] = useState(0);
 
   const { data: examOptions } = useQuery({
     queryKey: ['exam-options-docs'],
     queryFn: getReflectionExamOptions,
   });
 
-  const handleDrop = () => {
-    // Simulate a file drop
-    const ext = 'pdf';
-    const fakeName = `document-${Date.now().toString(36)}.${ext}`;
-    setFileName(fakeName);
-    setName(name || fakeName);
-    setFileSize(Math.floor(Math.random() * 5000000) + 100000); // 100KB - 5MB
+  const createMutation = useMutation({
+    mutationFn: createDocument,
+    onSuccess: () => {
+      toast.success('Document created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      queryClient.invalidateQueries({ queryKey: ['document-stats'] });
+      onOpenChange(false);
+      resetForm();
+      onSuccess();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || 'Failed to create document');
+    },
+  });
+
+  const resetForm = () => {
+    setName('');
+    setCategory('');
+    setExamName('');
+    setYear('');
+    setNote('');
   };
 
   const handleSubmit = () => {
-    if (!name.trim() || !category) {
-      toast.error('Please fill in document name and category');
-      return;
-    }
-    onUpload({
+    if (!name.trim()) { toast.error('Document name is required'); return; }
+    if (!category) { toast.error('Please select a category'); return; }
+    createMutation.mutate({
       name: name.trim(),
       category,
       examName: examName || undefined,
       year: year || undefined,
       note: note || undefined,
-      fileSize: fileSize || undefined,
     });
   };
 
   return (
-    <div className="space-y-4">
-      {/* Drag & Drop Zone */}
-      <div
-        onClick={handleDrop}
-        className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5 cursor-pointer"
-      >
-        <Upload className="size-8 text-muted-foreground" />
-        <p className="text-sm text-muted-foreground">
-          {fileName ? `📎 ${fileName} (${formatFileSize(fileSize)})` : 'Click to select a file'}
-        </p>
-      </div>
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Upload className="h-5 w-5 text-emerald-600" />
+            Create Document
+          </DialogTitle>
+          <DialogDescription>Add a new document to your collection.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 mt-2">
+          {/* Name */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Document Name <span className="text-red-500">*</span>
+            </Label>
+            <Input
+              placeholder="e.g. IBPS PO 2024 Scorecard"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
 
-      {/* Name */}
-      <div className="space-y-2">
-        <Label>Document Name</Label>
-        <Input
-          placeholder="e.g. IBPS PO 2024 Scorecard"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
+          {/* Category & Year */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                Category <span className="text-red-500">*</span>
+              </Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORY_OPTIONS.map((c) => {
+                    const cfg = getCategoryConfig(c);
+                    const Icon = cfg.icon;
+                    return (
+                      <SelectItem key={c} value={c}>
+                        <span className="flex items-center gap-2">
+                          <Icon className="h-3.5 w-3.5" /> {c}
+                        </span>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Year</Label>
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {YEAR_OPTIONS.map((y) => (
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-      {/* Category & Year */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <Select value={category} onValueChange={setCategory}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select..." />
-            </SelectTrigger>
-            <SelectContent>
-              {CATEGORY_OPTIONS.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {getCategoryIcon(c)} {c}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Link to Exam */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Link to Exam (Optional)</Label>
+            <Select value={examName} onValueChange={setExamName}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select exam..." />
+              </SelectTrigger>
+              <SelectContent>
+                {examOptions?.map((e) => (
+                  <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Notes */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Notes (Optional)</Label>
+            <Textarea
+              placeholder="Add any notes..."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
         </div>
-        <div className="space-y-2">
-          <Label>Year</Label>
-          <Select value={year} onValueChange={setYear}>
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select..." />
-            </SelectTrigger>
-            <SelectContent>
-              {YEAR_OPTIONS.map((y) => (
-                <SelectItem key={y} value={y}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Link to Exam */}
-      <div className="space-y-2">
-        <Label>Link to Exam (Optional)</Label>
-        <Select value={examName} onValueChange={setExamName}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select exam..." />
-          </SelectTrigger>
-          <SelectContent>
-            {examOptions?.map((e) => (
-              <SelectItem key={e.id} value={e.name}>
-                {e.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Notes */}
-      <div className="space-y-2">
-        <Label>Notes (Optional)</Label>
-        <Textarea
-          placeholder="Add any notes..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={3}
-          className="resize-none"
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="flex justify-end gap-2 pt-2">
-        {onCancel && (
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={createMutation.isPending || !name.trim() || !category}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {createMutation.isPending ? 'Creating...' : 'Create Document'}
           </Button>
-        )}
-        <Button
-          onClick={handleSubmit}
-          disabled={isPending}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white"
-        >
-          <Upload className="mr-2 size-4" />
-          {isPending ? 'Uploading...' : 'Upload'}
-        </Button>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -327,7 +329,7 @@ export default function DocumentsPage() {
   const [page, setPage] = useState(1);
 
   // Dialog state
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<DocType | null>(null);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
 
@@ -351,19 +353,6 @@ export default function DocumentsPage() {
   });
 
   // ── Mutations ───────────────────────────────────────────
-  const uploadMutation = useMutation({
-    mutationFn: createDocument,
-    onSuccess: () => {
-      toast.success('Document uploaded successfully!');
-      queryClient.invalidateQueries({ queryKey: ['documents'] });
-      queryClient.invalidateQueries({ queryKey: ['document-stats'] });
-      setUploadDialogOpen(false);
-    },
-    onError: (err: Error) => {
-      toast.error(err.message || 'Failed to upload document');
-    },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: deleteDocument,
     onSuccess: () => {
@@ -377,10 +366,6 @@ export default function DocumentsPage() {
     },
   });
 
-  const handleUpload = (data: Parameters<typeof createDocument>[0]) => {
-    uploadMutation.mutate(data);
-  };
-
   // ── Computed ────────────────────────────────────────────
   const documents = docsData?.data ?? [];
   const pagination = docsData?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, pages: 0 };
@@ -388,6 +373,18 @@ export default function DocumentsPage() {
     const map = new Map<string, number>();
     stats?.categories?.forEach((c) => map.set(c.label, c.count));
     return map;
+  }, [stats]);
+
+  // Donut chart data
+  const donutData = useMemo(() => {
+    if (!stats?.categories?.length) return [];
+    return stats.categories
+      .filter((c) => c.count > 0)
+      .map((c, i) => ({
+        category: c.label,
+        value: c.count,
+        color: CHART_COLORS[i % CHART_COLORS.length],
+      }));
   }, [stats]);
 
   const storageUsedGB = stats?.totalSize
@@ -404,7 +401,7 @@ export default function DocumentsPage() {
   // ── Loading ─────────────────────────────────────────────
   if (loadingDocs && loadingStats) {
     return (
-      <div className="space-y-6 p-4 md:p-6">
+      <div className="space-y-6">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-9 w-36" />
@@ -412,7 +409,7 @@ export default function DocumentsPage() {
         <Skeleton className="h-12 w-full" />
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-20" />
+            <Skeleton key={i} className="h-20 rounded-xl" />
           ))}
         </div>
         <Skeleton className="h-64 w-full" />
@@ -421,40 +418,28 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Documents
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Manage your exam-related documents
           </p>
         </div>
-        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
-              <Upload className="mr-2 size-4" />
-              Upload Document
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>Upload Document</DialogTitle>
-              <DialogDescription>
-                Add a new document to your collection.
-              </DialogDescription>
-            </DialogHeader>
-            <UploadForm
-              onUpload={handleUpload}
-              onCancel={() => setUploadDialogOpen(false)}
-              isPending={uploadMutation.isPending}
-            />
-          </DialogContent>
-        </Dialog>
+        <Button
+          className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800"
+          onClick={() => setCreateDialogOpen(true)}
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Document
+        </Button>
       </div>
 
       {/* ── Search & Filter Bar ─────────────────────────── */}
-      <Card>
+      <Card className="transition-shadow duration-200 hover:shadow-md">
         <CardContent className="p-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative flex-1">
@@ -469,7 +454,7 @@ export default function DocumentsPage() {
                 className="pl-9"
               />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Select
                 value={categoryFilter}
                 onValueChange={(v) => {
@@ -483,9 +468,7 @@ export default function DocumentsPage() {
                 <SelectContent>
                   <SelectItem value="__all">All Categories</SelectItem>
                   {CATEGORY_OPTIONS.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {getCategoryIcon(c)} {c}
-                    </SelectItem>
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -503,9 +486,7 @@ export default function DocumentsPage() {
                 <SelectContent>
                   <SelectItem value="__all">All Years</SelectItem>
                   {YEAR_OPTIONS.map((y) => (
-                    <SelectItem key={y} value={y}>
-                      {y}
-                    </SelectItem>
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -517,9 +498,7 @@ export default function DocumentsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {SORT_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
-                    </SelectItem>
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -545,11 +524,12 @@ export default function DocumentsPage() {
         </CardContent>
       </Card>
 
-      {/* ── Category Cards ──────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* ── Category Cards ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         {CATEGORIES.map((cat) => {
           const count = categoryCounts.get(cat.label) ?? 0;
           const isActive = categoryFilter === cat.label;
+          const Icon = cat.icon;
           return (
             <button
               key={cat.label}
@@ -561,49 +541,76 @@ export default function DocumentsPage() {
                 }
                 setPage(1);
               }}
-              className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${
+              className={cn(
+                'flex flex-col items-center gap-2 rounded-xl border p-3 text-center transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
                 isActive
                   ? 'border-emerald-500 bg-emerald-500/10 shadow-sm'
-                  : 'hover:border-emerald-500/40'
-              }`}
+                  : 'hover:border-emerald-500/40',
+              )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-2xl">{cat.icon}</span>
-                <span
-                  className={`text-lg font-bold ${
-                    isActive
-                      ? 'text-emerald-600 dark:text-emerald-400'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  {count}
-                </span>
+              <div className={cn(
+                'flex h-8 w-8 items-center justify-center rounded-lg',
+                cat.color, cat.darkColor,
+              )}>
+                <Icon className="h-4 w-4" />
               </div>
-              <p className="mt-2 text-sm font-medium leading-tight">{cat.label}</p>
+              <span className={cn(
+                'text-lg font-bold',
+                isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+              )}>
+                {count}
+              </span>
+              <p className="text-[11px] font-medium leading-tight text-muted-foreground">{cat.label}</p>
             </button>
           );
         })}
       </div>
 
       {/* ── Main Content: Table + Sidebar ───────────────── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_300px]">
         {/* Documents Table */}
-        <Card>
+        <Card className="transition-shadow duration-200 hover:shadow-md">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <FolderOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
-              All Documents
-            </CardTitle>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                <FolderOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div>
+                <CardTitle className="text-base font-semibold">All Documents</CardTitle>
+                <CardDescription className="text-xs">
+                  {pagination.total} document{pagination.total !== 1 ? 's' : ''} in your collection
+                </CardDescription>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {documents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
-                <FileText className="size-12 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  {search || categoryFilter || yearFilter
-                    ? 'No documents match your filters'
-                    : 'No documents yet. Upload your first document!'}
-                </p>
+              <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                  <FileText className="size-8 text-muted-foreground/40" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {search || categoryFilter || yearFilter
+                      ? 'No documents match your filters'
+                      : 'No documents yet'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">
+                    {search || categoryFilter || yearFilter
+                      ? 'Try adjusting your search or filters'
+                      : 'Click "Create Document" to add your first one'}
+                  </p>
+                </div>
+                {!search && !categoryFilter && !yearFilter && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400"
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Create Document
+                  </Button>
+                )}
               </div>
             ) : (
               <>
@@ -620,150 +627,142 @@ export default function DocumentsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {documents.map((doc) => (
-                        <>
-                          <TableRow
-                            key={doc.id}
-                            className="cursor-pointer"
-                            onClick={() =>
-                              setExpandedDoc(expandedDoc === doc.id ? null : doc.id)
-                            }
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <File className="size-4 shrink-0 text-muted-foreground" />
-                                <div className="min-w-0">
-                                  <p className="text-sm font-medium truncate">
-                                    {doc.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground sm:hidden">
-                                    {doc.examName ?? '—'}
-                                  </p>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
-                              {doc.examName ?? '—'}
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={getCategoryBadgeVariant(doc.category)}
-                                className={
-                                  doc.category === 'Scorecard' || doc.category === 'Result'
-                                    ? 'bg-emerald-600/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/20'
-                                    : ''
-                                }
-                              >
-                                {getCategoryIcon(doc.category)} {doc.category}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                              {formatDate(doc.createdAt)}
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                              {formatFileSize(doc.fileSize)}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedDoc(
-                                      expandedDoc === doc.id ? null : doc.id
-                                    );
-                                  }}
-                                  title="View details"
-                                >
-                                  <Eye className="size-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={(e) => e.stopPropagation()}
-                                  title="Download"
-                                >
-                                  <Download className="size-3.5" />
-                                </Button>
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      className="h-8 w-8"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <MoreHorizontal className="size-3.5" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        toast.info('Download started');
-                                      }}
-                                    >
-                                      <Download className="mr-2 size-4" />
-                                      Download
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      className="text-red-600 dark:text-red-400 focus:text-red-600"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteTarget(doc);
-                                      }}
-                                    >
-                                      <Trash2 className="mr-2 size-4" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                          {/* Expanded row */}
-                          {expandedDoc === doc.id && (
-                            <TableRow key={`${doc.id}-expanded`}>
-                              <TableCell colSpan={6} className="bg-muted/30 px-6 py-4">
-                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                                  <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Document Name</p>
-                                    <p className="text-sm font-medium">{doc.name}</p>
+                      {documents.map((doc) => {
+                        const catCfg = getCategoryConfig(doc.category);
+                        const CatIcon = catCfg.icon;
+                        return (
+                          <>
+                            <TableRow
+                              key={doc.id}
+                              className="cursor-pointer transition-colors hover:bg-muted/50"
+                              onClick={() =>
+                                setExpandedDoc(expandedDoc === doc.id ? null : doc.id)
+                              }
+                            >
+                              <TableCell>
+                                <div className="flex items-center gap-2.5">
+                                  <div className={cn(
+                                    'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md',
+                                    catCfg.color, catCfg.darkColor,
+                                  )}>
+                                    <CatIcon className="h-4 w-4" />
                                   </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Category</p>
-                                    <Badge variant="secondary">{doc.category}</Badge>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Linked Exam</p>
-                                    <p className="text-sm">{doc.examName ?? 'None'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Year</p>
-                                    <p className="text-sm">{doc.year ?? '—'}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Uploaded</p>
-                                    <p className="text-sm">{formatDate(doc.createdAt)}</p>
-                                  </div>
-                                  <div>
-                                    <p className="text-xs text-muted-foreground mb-1">Size</p>
-                                    <p className="text-sm">{formatFileSize(doc.fileSize)}</p>
-                                  </div>
-                                  <div className="sm:col-span-2">
-                                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                                    <p className="text-sm">{doc.note ?? 'No notes'}</p>
+                                  <div className="min-w-0">
+                                    <p className="text-sm font-medium truncate">{doc.name}</p>
+                                    <p className="text-xs text-muted-foreground sm:hidden">
+                                      {doc.examName ?? '—'}
+                                    </p>
                                   </div>
                                 </div>
                               </TableCell>
+                              <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                                {doc.examName ?? '—'}
+                              </TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant="outline"
+                                  className={cn('border text-[11px] font-medium', catCfg.color, catCfg.darkColor)}
+                                >
+                                  {doc.category}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                                {formatDate(doc.createdAt)}
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                                {formatFileSize(doc.fileSize)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setExpandedDoc(expandedDoc === doc.id ? null : doc.id);
+                                    }}
+                                    title="View details"
+                                  >
+                                    <Eye className="size-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title="Download"
+                                  >
+                                    <Download className="size-3.5" />
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <MoreHorizontal className="size-3.5" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem
+                                        onClick={(e) => { e.stopPropagation(); toast.info('Download started'); }}
+                                      >
+                                        <Download className="mr-2 size-4" /> Download
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-red-600 dark:text-red-400 focus:text-red-600"
+                                        onClick={(e) => { e.stopPropagation(); setDeleteTarget(doc); }}
+                                      >
+                                        <Trash2 className="mr-2 size-4" /> Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </TableCell>
                             </TableRow>
-                          )}
-                        </>
-                      ))}
+                            {expandedDoc === doc.id && (
+                              <TableRow key={`${doc.id}-expanded`}>
+                                <TableCell colSpan={6} className="bg-muted/30 px-6 py-4">
+                                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Document Name</p>
+                                      <p className="text-sm font-medium">{doc.name}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Category</p>
+                                      <Badge variant="secondary">{doc.category}</Badge>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Linked Exam</p>
+                                      <p className="text-sm">{doc.examName ?? 'None'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Year</p>
+                                      <p className="text-sm">{doc.year ?? '—'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Uploaded</p>
+                                      <p className="text-sm">{formatDate(doc.createdAt)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-xs text-muted-foreground mb-1">Size</p>
+                                      <p className="text-sm">{formatFileSize(doc.fileSize)}</p>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                      <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                                      <p className="text-sm">{doc.note ?? 'No notes'}</p>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -771,14 +770,9 @@ export default function DocumentsPage() {
                 {/* Pagination */}
                 <div className="flex items-center justify-between border-t px-4 py-3">
                   <p className="text-sm text-muted-foreground">
-                    Showing{' '}
-                    <span className="font-medium text-foreground">
-                      {pagination.total > 0 ? startItem : 0}
-                    </span>{' '}
-                    to{' '}
+                    Showing <span className="font-medium text-foreground">{pagination.total > 0 ? startItem : 0}</span> to{' '}
                     <span className="font-medium text-foreground">{endItem}</span> of{' '}
-                    <span className="font-medium text-foreground">{pagination.total}</span>{' '}
-                    documents
+                    <span className="font-medium text-foreground">{pagination.total}</span> documents
                   </p>
                   <div className="flex items-center gap-1">
                     <Button
@@ -790,9 +784,7 @@ export default function DocumentsPage() {
                     >
                       <ChevronLeft className="size-4" />
                     </Button>
-                    <span className="px-2 text-sm text-muted-foreground">
-                      {page} / {pagination.pages || 1}
-                    </span>
+                    <span className="px-2 text-sm text-muted-foreground">{page} / {pagination.pages || 1}</span>
                     <Button
                       variant="outline"
                       size="icon"
@@ -810,21 +802,59 @@ export default function DocumentsPage() {
         </Card>
 
         {/* ── Sidebar ──────────────────────────────────── */}
-        <div className="space-y-4 hidden lg:block">
+        <div className="space-y-4">
+          {/* Category Distribution Donut */}
+          <Card className="transition-shadow duration-200 hover:shadow-md">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                  <PieChart className="size-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-sm font-semibold">Category Distribution</CardTitle>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {donutData.length > 0 ? (
+                <>
+                  <DonutChart
+                    data={donutData}
+                    dataKey="value"
+                    nameKey="category"
+                    centerLabel="Docs"
+                    centerValue={donutData.reduce((a, c) => a + c.value, 0)}
+                    height={180}
+                  />
+                  <div className="mt-2 flex flex-wrap justify-center gap-2">
+                    {donutData.map((d) => (
+                      <div key={d.category} className="flex items-center gap-1.5 text-[11px]">
+                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                        <span className="text-muted-foreground">{d.category}</span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <p className="py-4 text-center text-xs text-muted-foreground">No data yet</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Storage Overview */}
-          <Card>
+          <Card className="transition-shadow duration-200 hover:shadow-md">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <HardDrive className="size-4 text-emerald-600 dark:text-emerald-400" />
-                Storage Overview
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/50">
+                  <HardDrive className="size-4 text-teal-600 dark:text-teal-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold">Storage</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Used</span>
-                <span className="font-medium">
-                  {storageUsedGB} / {TOTAL_STORAGE_GB} GB
-                </span>
+                <span className="font-medium">{storageUsedGB} / {TOTAL_STORAGE_GB} GB</span>
               </div>
               <Progress
                 value={storagePercent}
@@ -837,45 +867,52 @@ export default function DocumentsPage() {
           </Card>
 
           {/* Recent Uploads */}
-          <Card>
+          <Card className="transition-shadow duration-200 hover:shadow-md">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Clock className="size-4 text-emerald-600 dark:text-emerald-400" />
-                Recent Uploads
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                  <Clock className="size-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold">Recent Uploads</CardTitle>
+              </div>
             </CardHeader>
             <CardContent>
               {stats?.recentUploads && stats.recentUploads.length > 0 ? (
-                <div className="space-y-3">
-                  {stats.recentUploads.slice(0, 4).map((file, idx) => (
-                    <div key={idx} className="flex items-center gap-2.5">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-                        <File className="size-3.5 text-muted-foreground" />
+                <div className="space-y-3 max-h-48 overflow-y-auto">
+                  {stats.recentUploads.slice(0, 5).map((file, idx) => {
+                    const catCfg = getCategoryConfig('Notes'); // default
+                    return (
+                      <div key={idx} className="flex items-center gap-2.5">
+                        <div className={cn(
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted',
+                        )}>
+                          <File className="size-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-medium truncate">{file.name}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {formatFileSize(file.fileSize)} · {formatDate(file.createdAt)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium truncate">{file.name}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatFileSize(file.fileSize)} · {formatDate(file.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-2">
-                  No recent uploads
-                </p>
+                <p className="text-xs text-muted-foreground text-center py-2">No recent uploads</p>
               )}
             </CardContent>
           </Card>
 
           {/* Linked Exams */}
-          <Card>
+          <Card className="transition-shadow duration-200 hover:shadow-md">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <FolderOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
-                Linked Exams
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                  <FolderOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold">Linked Exams</CardTitle>
+              </div>
             </CardHeader>
             <CardContent>
               {stats?.linkedExams && stats.linkedExams.length > 0 ? (
@@ -883,7 +920,7 @@ export default function DocumentsPage() {
                   {stats.linkedExams.map((item, idx) => (
                     <div
                       key={idx}
-                      className="flex items-center justify-between rounded-lg border p-2"
+                      className="flex items-center justify-between rounded-lg border p-2 transition-colors hover:bg-muted/50"
                     >
                       <div className="min-w-0">
                         <p className="text-xs font-medium truncate">{item.examName}</p>
@@ -891,59 +928,38 @@ export default function DocumentsPage() {
                           {item.count} {item.count === 1 ? 'document' : 'documents'}
                         </p>
                       </div>
-                      <Badge variant="secondary" className="text-[11px] shrink-0">
-                        {item.count}
-                      </Badge>
+                      <Badge variant="secondary" className="text-[11px] shrink-0">{item.count}</Badge>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-2">
-                  No linked exams
-                </p>
+                <p className="text-xs text-muted-foreground text-center py-2">No linked exams</p>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
 
-      {/* ── Quick Upload Section ────────────────────────── */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Upload className="size-4 text-emerald-600 dark:text-emerald-400" />
-            Quick Upload
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <UploadForm
-            onUpload={handleUpload}
-            isPending={uploadMutation.isPending}
-          />
-        </CardContent>
-      </Card>
+      {/* ── Create Document Dialog ── */}
+      <CreateDocumentDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSuccess={() => {}}
+      />
 
-      {/* ── Delete Confirmation Dialog ──────────────────── */}
-      <AlertDialog
-        open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
-      >
+      {/* ── Delete Confirmation Dialog ── */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Document</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action
-              cannot be undone.
+              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
-              }}
+              onClick={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget.id); }}
               className="bg-red-600 hover:bg-red-700 text-white"
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}

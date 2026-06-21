@@ -8,7 +8,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import { getDevices, type Device } from '@/lib/api';
+import { getDevices, getUser, type Device } from '@/lib/api';
+import { useUserStore } from '@/store/user-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,7 +38,9 @@ const securityTips = [
 
 export default function SignOutPage() {
   const [confirmAllOpen, setConfirmAllOpen] = useState(false);
+  const profile = useUserStore((s) => s.profile);
   const { data: devices, isLoading } = useQuery({ queryKey: ['devices'], queryFn: getDevices });
+  const initials = profile?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
 
   const handleSignOutDevice = (device: Device) => {
     if (device.isCurrent) {
@@ -82,12 +85,12 @@ export default function SignOutPage() {
           <div className="flex items-center gap-4">
             <Avatar className="size-12">
               <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 text-sm font-bold">
-                AC
+                {initials}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="font-semibold">Alex Chen</p>
-              <p className="text-sm text-muted-foreground">alex@example.com</p>
+              <p className="font-semibold">{profile?.name || 'User'}</p>
+              <p className="text-sm text-muted-foreground">{profile?.email || 'user@example.com'}</p>
             </div>
             <Button variant="outline" className="gap-2" onClick={() => {
               toast.info('You will be signed out from this device');

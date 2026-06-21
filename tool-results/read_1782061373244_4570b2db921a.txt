@@ -1,0 +1,877 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useState, useCallback } from 'react';
+     4→     4→import {
+     5→     5→  useQuery,
+     6→     6→  useMutation,
+     7→     7→  useQueryClient,
+     8→     8→} from '@tanstack/react-query';
+     9→     9→import { toast } from 'sonner';
+    10→    10→import {
+    11→    11→  ArrowLeft,
+    12→    12→  Save,
+    13→    13→  X,
+    14→    14→  Upload,
+    15→    15→  FileText,
+    16→    16→  GripVertical,
+    17→    17→  ChevronDown,
+    18→    18→} from 'lucide-react';
+    19→    19→import { useNavigationStore } from '@/store/navigation';
+    20→    20→import {
+    21→    21→  getReflectionExamOptions,
+    22→    22→  getReflection,
+    23→    23→  getReflections,
+    24→    24→  getExam,
+    25→    25→  createReflection,
+    26→    26→  updateReflection,
+    27→    27→  type Reflection,
+    28→    28→  type ReflectionSection,
+    29→    29→  type Exam,
+    30→    30→} from '@/lib/api';
+    31→    31→
+    32→    32→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    33→    33→import { Button } from '@/components/ui/button';
+    34→    34→import { Label } from '@/components/ui/label';
+    35→    35→import { Input } from '@/components/ui/input';
+    36→    36→import { Textarea } from '@/components/ui/textarea';
+    37→    37→import { Slider } from '@/components/ui/slider';
+    38→    38→import { Badge } from '@/components/ui/badge';
+    39→    39→import { Skeleton } from '@/components/ui/skeleton';
+    40→    40→import {
+    41→    41→  Select,
+    42→    42→  SelectContent,
+    43→    43→  SelectItem,
+    44→    44→  SelectTrigger,
+    45→    45→  SelectValue,
+    46→    46→} from '@/components/ui/select';
+    47→    47→import {
+    48→    48→  Table,
+    49→    49→  TableBody,
+    50→    50→  TableCell,
+    51→    51→  TableHead,
+    52→    52→  TableHeader,
+    53→    53→  TableRow,
+    54→    54→} from '@/components/ui/table';
+    55→    55→
+    56→    56→// ── Constants ────────────────────────────────────────────────
+    57→    57→const DIFFICULTY_OPTIONS = ['Easy', 'Moderate', 'Hard', 'Very Hard'];
+    58→    58→const EMOTIONAL_OPTIONS = ['Confident', 'Anxious', 'Neutral', 'Frustrated'];
+    59→    59→const MISTAKE_TAG_OPTIONS = [
+    60→    60→  'Time Management',
+    61→    61→  'Concept Gap',
+    62→    62→  'Silly Mistakes',
+    63→    63→  'Calculation Errors',
+    64→    64→  'Pressure Handling',
+    65→    65→  'Guessing',
+    66→    66→  'Revision Gap',
+    67→    67→  'Speed Issues',
+    68→    68→  'Accuracy',
+    69→    69→  'Question Selection',
+    70→    70→];
+    71→    71→const STRENGTH_TAG_OPTIONS = [
+    72→    72→  'Strong in Reasoning',
+    73→    73→  'Good Speed',
+    74→    74→  'Accurate in English',
+    75→    75→  'Strong Quant',
+    76→    76→  'Good GK',
+    77→    77→  'Puzzle Solver',
+    78→    78→  'Fast Reader',
+    79→    79→];
+    80→    80→const REMINDER_TYPE_OPTIONS = [
+    81→    81→  '1 Day Before',
+    82→    82→  '3 Days Before',
+    83→    83→  '1 Week Before',
+    84→    84→  'Custom',
+    85→    85→];
+    86→    86→
+    87→    87→interface SectionReflection {
+    88→    88→  section: string;
+    89→    89→  score: string;
+    90→    90→  strength: string;
+    91→    91→  weakness: string;
+    92→    92→  actionPlan: string;
+    93→    93→}
+    94→    94→
+    95→    95→// ── Component ────────────────────────────────────────────────
+    96→    96→export default function ReflectionsPage() {
+    97→    97→  const { navigate, previousPage } = useNavigationStore();
+    98→    98→  const queryClient = useQueryClient();
+    99→    99→
+   100→   100→  // editing reflection id (passed via store or query param style)
+   101→   101→  const [editingId, setEditingId] = useState<string | null>(null);
+   102→   102→  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+   103→   103→  const [manualExamData, setExamData] = useState<Exam | null>(null);
+   104→   104→
+   105→   105→  // Form state
+   106→   106→  const [difficulty, setDifficulty] = useState('');
+   107→   107→  const [confidence, setConfidence] = useState(50);
+   108→   108→  const [emotionalState, setEmotionalState] = useState('');
+   109→   109→  const [mistakeTags, setMistakeTags] = useState<string[]>([]);
+   110→   110→  const [strengthTags, setStrengthTags] = useState<string[]>([]);
+   111→   111→  const [whatWentWrong, setWhatWentWrong] = useState('');
+   112→   112→  const [whatWentWell, setWhatWentWell] = useState('');
+   113→   113→  const [biggestLesson, setBiggestLesson] = useState('');
+   114→   114→  const [actionPlan, setActionPlan] = useState('');
+   115→   115→  const [targetScore, setTargetScore] = useState('');
+   116→   116→  const [goalDescription, setGoalDescription] = useState('');
+   117→   117→  const [manualSections, setSectionReflections] = useState<SectionReflection[]>([]);
+   118→   118→  const [attachments, setAttachments] = useState<string[]>([]);
+   119→   119→  const [reminderType, setReminderType] = useState('');
+   120→   120→  const [reminderDate, setReminderDate] = useState('');
+   121→   121→
+   122→   122→  // ── Queries ─────────────────────────────────────────────
+   123→   123→  const { data: examOptions, isLoading: loadingOptions } = useQuery({
+   124→   124→    queryKey: ['reflection-exam-options'],
+   125→   125→    queryFn: getReflectionExamOptions,
+   126→   126→  });
+   127→   127→
+   128→   128→  const { data: reflections, isLoading: loadingReflections } = useQuery({
+   129→   129→    queryKey: ['reflections-list'],
+   130→   130→    queryFn: () => getReflections(),
+   131→   131→  });
+   132→   132→
+   133→   133→  const { data: selectedExam, isLoading: loadingExam } = useQuery({
+   134→   134→    queryKey: ['exam-for-reflection', selectedExamId],
+   135→   135→    queryFn: () => getExam(selectedExamId!),
+   136→   136→    enabled: !!selectedExamId,
+   137→   137→  });
+   138→   138→
+   139→   139→  // Derive examData from query result (avoids synchronous setState in effect)
+   140→   140→  const derivedExamData = selectedExam;
+   141→   141→  const derivedSections = selectedExam?.sectionalScores?.length
+   142→   142→    ? selectedExam.sectionalScores.map((s) => ({
+   143→   143→        section: s.section,
+   144→   144→        score: String(s.score ?? ''),
+   145→   145→        strength: '',
+   146→   146→        weakness: '',
+   147→   147→        actionPlan: '',
+   148→   148→      }))
+   149→   149→    : [];
+   150→   150→  // examData and sectionReflections prefer manually-set values (from loadReflection), else use query-derived
+   151→   151→  const examData = manualExamData || derivedExamData;
+   152→   152→  const sectionReflections = manualSections.length > 0 ? manualSections : derivedSections;
+   153→   153→
+   154→   154→  // ── Load existing reflection ────────────────────────────
+   155→   155→  const loadReflection = useCallback(
+   156→   156→    (r: Reflection) => {
+   157→   157→      setEditingId(r.id);
+   158→   158→      if (r.examId) {
+   159→   159→        setSelectedExamId(r.examId);
+   160→   160→        getExam(r.examId).then((exam) => {
+   161→   161→          setExamData(exam);
+   162→   162→          if (exam.sectionalScores?.length) {
+   163→   163→            const sectionMap = new Map(
+   164→   164→              r.sections?.map((s) => [s.section, s]) ?? []
+   165→   165→            );
+   166→   166→            setSectionReflections(
+   167→   167→              exam.sectionalScores.map((s) => {
+   168→   168→                const existing = sectionMap.get(s.section);
+   169→   169→                return {
+   170→   170→                  section: s.section,
+   171→   171→                  score: existing?.score != null ? String(existing.score) : String(s.score ?? ''),
+   172→   172→                  strength: existing?.strength ?? '',
+   173→   173→                  weakness: existing?.weakness ?? '',
+   174→   174→                  actionPlan: existing?.actionPlan ?? '',
+   175→   175→                };
+   176→   176→              })
+   177→   177→            );
+   178→   178→          }
+   179→   179→        });
+   180→   180→      }
+   181→   181→      setDifficulty(r.difficulty ?? '');
+   182→   182→      setConfidence(r.confidence ?? 50);
+   183→   183→      setEmotionalState(r.emotionalState ?? '');
+   184→   184→      setMistakeTags(r.mistakeTags ? r.mistakeTags.split(',').filter(Boolean) : []);
+   185→   185→      setStrengthTags(r.strengthTags ? r.strengthTags.split(',').filter(Boolean) : []);
+   186→   186→      setWhatWentWrong(r.whatWentWrong ?? '');
+   187→   187→      setWhatWentWell(r.whatWentWell ?? '');
+   188→   188→      setBiggestLesson(r.biggestLesson ?? '');
+   189→   189→      setActionPlan(r.actionPlan ?? '');
+   190→   190→      setTargetScore(r.targetScore != null ? String(r.targetScore) : '');
+   191→   191→      setGoalDescription(r.goalDescription ?? '');
+   192→   192→      setReminderType(r.reminderType ?? '');
+   193→   193→      setReminderDate(r.reminderDate ?? '');
+   194→   194→    },
+   195→   195→    []
+   196→   196→  );
+   197→   197→
+   198→   198→  // ── Mutations ───────────────────────────────────────────
+   199→   199→  const saveMutation = useMutation({
+   200→   200→    mutationFn: (data: Parameters<typeof createReflection>[0]) => {
+   201→   201→      if (editingId) return updateReflection(editingId, data);
+   202→   202→      return createReflection(data);
+   203→   203→    },
+   204→   204→    onSuccess: () => {
+   205→   205→      toast.success(editingId ? 'Reflection updated!' : 'Reflection saved!');
+   206→   206→      queryClient.invalidateQueries({ queryKey: ['reflections'] });
+   207→   207→      queryClient.invalidateQueries({ queryKey: ['reflection-exam-options'] });
+   208→   208→      queryClient.invalidateQueries({ queryKey: ['exams'] });
+   209→   209→      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+   210→   210→      queryClient.invalidateQueries({ queryKey: ['weakness'] });
+   211→   211→      navigate('history');
+   212→   212→    },
+   213→   213→    onError: (err: Error) => {
+   214→   214→      toast.error(err.message || 'Failed to save reflection');
+   215→   215→    },
+   216→   216→  });
+   217→   217→
+   218→   218→  // ── Handlers ────────────────────────────────────────────
+   219→   219→  const toggleTag = (tag: string, list: string[], setter: (v: string[]) => void) => {
+   220→   220→    setter(list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag]);
+   221→   221→  };
+   222→   222→
+   223→   223→  const updateSection = (idx: number, field: keyof SectionReflection, value: string) => {
+   224→   224→    setSectionReflections((prev) =>
+   225→   225→      prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s))
+   226→   226→    );
+   227→   227→  };
+   228→   228→
+   229→   229→  const handleSave = () => {
+   230→   230→    if (!selectedExamId) {
+   231→   231→      toast.error('Please select an exam');
+   232→   232→      return;
+   233→   233→    }
+   234→   234→    const payload: Parameters<typeof createReflection>[0] = {
+   235→   235→      examId: selectedExamId,
+   236→   236→      examName: examData?.name ?? '',
+   237→   237→      examDate: examData?.examDate ?? null,
+   238→   238→      score: examData?.score ?? null,
+   239→   239→      cutoff: examData?.cutoff ?? null,
+   240→   240→      gap: examData?.cutoffGap ?? null,
+   241→   241→      result: examData?.result ?? null,
+   242→   242→      difficulty: difficulty || null,
+   243→   243→      confidence,
+   244→   244→      emotionalState: emotionalState || null,
+   245→   245→      mistakeTags: mistakeTags.length ? mistakeTags.join(',') : null,
+   246→   246→      strengthTags: strengthTags.length ? strengthTags.join(',') : null,
+   247→   247→      whatWentWrong: whatWentWrong || null,
+   248→   248→      whatWentWell: whatWentWell || null,
+   249→   249→      biggestLesson: biggestLesson || null,
+   250→   250→      actionPlan: actionPlan || null,
+   251→   251→      targetScore: targetScore ? Number(targetScore) : null,
+   252→   252→      goalDescription: goalDescription || null,
+   253→   253→      reminderType: reminderType || null,
+   254→   254→      reminderDate: reminderDate || null,
+   255→   255→      sections: sectionReflections.map((s) => ({
+   256→   256→        section: s.section,
+   257→   257→        score: s.score ? Number(s.score) : undefined,
+   258→   258→        strength: s.strength || undefined,
+   259→   259→        weakness: s.weakness || undefined,
+   260→   260→        actionPlan: s.actionPlan || undefined,
+   261→   261→      })),
+   262→   262→    };
+   263→   263→    saveMutation.mutate(payload);
+   264→   264→  };
+   265→   265→
+   266→   266→  const handleCancel = () => {
+   267→   267→    resetForm();
+   268→   268→    if (previousPage && previousPage !== 'reflections') {
+   269→   269→      navigate(previousPage);
+   270→   270→    } else {
+   271→   271→      navigate('history');
+   272→   272→    }
+   273→   273→  };
+   274→   274→
+   275→   275→  const resetForm = () => {
+   276→   276→    setEditingId(null);
+   277→   277→    setSelectedExamId(null);
+   278→   278→    setExamData(null);
+   279→   279→    setDifficulty('');
+   280→   280→    setConfidence(50);
+   281→   281→    setEmotionalState('');
+   282→   282→    setMistakeTags([]);
+   283→   283→    setStrengthTags([]);
+   284→   284→    setWhatWentWrong('');
+   285→   285→    setWhatWentWell('');
+   286→   286→    setBiggestLesson('');
+   287→   287→    setActionPlan('');
+   288→   288→    setTargetScore('');
+   289→   289→    setGoalDescription('');
+   290→   290→    setSectionReflections([]);
+   291→   291→    setAttachments([]);
+   292→   292→    setReminderType('');
+   293→   293→    setReminderDate('');
+   294→   294→  };
+   295→   295→
+   296→   296→  const handleSelectExam = (examId: string) => {
+   297→   297→    if (editingId) return; // don't switch exam when editing
+   298→   298→    resetForm();
+   299→   299→    setSelectedExamId(examId);
+   300→   300→  };
+   301→   301→
+   302→   302→  const addAttachment = (name: string) => {
+   303→   303→    setAttachments((prev) => [...prev, name]);
+   304→   304→  };
+   305→   305→
+   306→   306→  const removeAttachment = (idx: number) => {
+   307→   307→    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+   308→   308→  };
+   309→   309→
+   310→   310→  // ── Render helpers ──────────────────────────────────────
+   311→   311→  const ToggleButton = ({
+   312→   312→    label,
+   313→   313→    active,
+   314→   314→    onClick,
+   315→   315→  }: {
+   316→   316→    label: string;
+   317→   317→    active: boolean;
+   318→   318→    onClick: () => void;
+   319→   319→  }) => (
+   320→   320→    <button
+   321→   321→      type="button"
+   322→   322→      onClick={onClick}
+   323→   323→      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+   324→   324→        active
+   325→   325→          ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+   326→   326→          : 'border-border bg-background text-muted-foreground hover:border-emerald-400 hover:text-emerald-600'
+   327→   327→      }`}
+   328→   328→    >
+   329→   329→      {label}
+   330→   330→    </button>
+   331→   331→  );
+   332→   332→
+   333→   333→  const resultColor = (r: string) => {
+   334→   334→    if (r === 'Qualified' || r === 'qualified') return 'text-emerald-600 dark:text-emerald-400';
+   335→   335→    if (r === 'Not Qualified' || r === 'not-qualified') return 'text-red-600 dark:text-red-400';
+   336→   336→    return 'text-muted-foreground';
+   337→   337→  };
+   338→   338→
+   339→   339→  // ── Loading state ───────────────────────────────────────
+   340→   340→  if (loadingOptions && loadingReflections) {
+   341→   341→    return (
+   342→   342→      <div className="space-y-6 p-4 md:p-6">
+   343→   343→        <Skeleton className="h-8 w-48" />
+   344→   344→        <Skeleton className="h-12 w-full" />
+   345→   345→        <Skeleton className="h-64 w-full" />
+   346→   346→        <Skeleton className="h-48 w-full" />
+   347→   347→      </div>
+   348→   348→    );
+   349→   349→  }
+   350→   350→
+   351→   351→  const existingReflections = reflections ?? [];
+   352→   352→
+   353→   353→  return (
+   354→   354→    <div className="space-y-6 p-4 md:p-6">
+   355→   355→      {/* ── Header ──────────────────────────────────────── */}
+   356→   356→      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   357→   357→        <div className="flex items-center gap-3">
+   358→   358→          <button
+   359→   359→            onClick={() => navigate(previousPage ?? 'history')}
+   360→   360→            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+   361→   361→          >
+   362→   362→            <ArrowLeft className="size-5" />
+   363→   363→          </button>
+   364→   364→          <div>
+   365→   365→            <h1 className="text-2xl font-bold tracking-tight">Exam Reflection</h1>
+   366→   366→            <p className="text-sm text-muted-foreground">
+   367→   367→              {editingId ? 'Edit your reflection' : 'Create a detailed reflection for an exam'}
+   368→   368→            </p>
+   369→   369→          </div>
+   370→   370→        </div>
+   371→   371→        <Button
+   372→   372→          variant="outline"
+   373→   373→          size="sm"
+   374→   374→          onClick={() => navigate('history')}
+   375→   375→          className="self-start sm:self-auto"
+   376→   376→        >
+   377→   377→          <ArrowLeft className="mr-1.5 size-3.5" />
+   378→   378→          Back to History
+   379→   379→        </Button>
+   380→   380→      </div>
+   381→   381→
+   382→   382→      {/* ── Existing reflections (when no exam selected) ── */}
+   383→   383→      {!selectedExamId && !editingId && (
+   384→   384→        <div className="space-y-4">
+   385→   385→          <Card>
+   386→   386→            <CardHeader className="pb-3">
+   387→   387→              <CardTitle className="text-base">Select Exam to Reflect On</CardTitle>
+   388→   388→            </CardHeader>
+   389→   389→            <CardContent>
+   390→   390→              <Select value={selectedExamId ?? ''} onValueChange={handleSelectExam}>
+   391→   391→                <SelectTrigger className="w-full">
+   392→   392→                  <SelectValue placeholder="Choose an exam..." />
+   393→   393→                </SelectTrigger>
+   394→   394→                <SelectContent>
+   395→   395→                  {examOptions?.map((e) => (
+   396→   396→                    <SelectItem key={e.id} value={e.id}>
+   397→   397→                      {e.name} — {e.examDate}
+   398→   398→                    </SelectItem>
+   399→   399→                  ))}
+   400→   400→                  {(!examOptions || examOptions.length === 0) && (
+   401→   401→                    <SelectItem value="__none" disabled>
+   402→   402→                      No exams available
+   403→   403→                    </SelectItem>
+   404→   404→                  )}
+   405→   405→                </SelectContent>
+   406→   406→              </Select>
+   407→   407→            </CardContent>
+   408→   408→          </Card>
+   409→   409→
+   410→   410→          {existingReflections.length > 0 && (
+   411→   411→            <Card>
+   412→   412→              <CardHeader className="pb-3">
+   413→   413→                <CardTitle className="text-base">Existing Reflections</CardTitle>
+   414→   414→              </CardHeader>
+   415→   415→              <CardContent>
+   416→   416→                <div className="space-y-2">
+   417→   417→                  {existingReflections.map((r) => (
+   418→   418→                    <button
+   419→   419→                      key={r.id}
+   420→   420→                      onClick={() => loadReflection(r)}
+   421→   421→                      className="flex w-full items-center justify-between rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"
+   422→   422→                    >
+   423→   423→                      <div>
+   424→   424→                        <p className="font-medium text-sm">{r.examName}</p>
+   425→   425→                        <p className="text-xs text-muted-foreground">
+   426→   426→                          {r.examDate} · Score: {r.score} · {r.difficulty}
+   427→   427→                        </p>
+   428→   428→                      </div>
+   429→   429→                      <Badge variant="secondary" className="text-xs shrink-0">
+   430→   430→                        {r.emotionalState}
+   431→   431→                      </Badge>
+   432→   432→                    </button>
+   433→   433→                  ))}
+   434→   434→                </div>
+   435→   435→              </CardContent>
+   436→   436→            </Card>
+   437→   437→          )}
+   438→   438→        </div>
+   439→   439→      )}
+   440→   440→
+   441→   441→      {/* ── Reflection Form ─────────────────────────────── */}
+   442→   442→      {selectedExamId && (
+   443→   443→        <div className="space-y-6">
+   444→   444→          {/* Exam Summary Card */}
+   445→   445→          <Card className="border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10">
+   446→   446→            <CardContent className="p-4">
+   447→   447→              {loadingExam ? (
+   448→   448→                <div className="flex items-center gap-4">
+   449→   449→                  <Skeleton className="h-16 w-16 rounded-lg" />
+   450→   450→                  <div className="space-y-2">
+   451→   451→                    <Skeleton className="h-5 w-40" />
+   452→   452→                    <Skeleton className="h-4 w-24" />
+   453→   453→                  </div>
+   454→   454→                </div>
+   455→   455→              ) : examData ? (
+   456→   456→                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   457→   457→                  <div className="flex items-center gap-4">
+   458→   458→                    <div className="flex size-12 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+   459→   459→                      <FileText className="size-6" />
+   460→   460→                    </div>
+   461→   461→                    <div>
+   462→   462→                      <h3 className="font-semibold">{examData.name}</h3>
+   463→   463→                      <p className="text-sm text-muted-foreground">
+   464→   464→                        {examData.examDate} · {examData.category} · Attempt #{examData.attempt}
+   465→   465→                      </p>
+   466→   466→                    </div>
+   467→   467→                  </div>
+   468→   468→                  <div className="flex items-center gap-4 text-sm">
+   469→   469→                    <div className="text-center">
+   470→   470→                      <p className="text-muted-foreground text-xs">Score</p>
+   471→   471→                      <p className="font-semibold">{examData.score}/{examData.maxScore}</p>
+   472→   472→                    </div>
+   473→   473→                    <div className="text-center">
+   474→   474→                      <p className="text-muted-foreground text-xs">Cutoff</p>
+   475→   475→                      <p className="font-semibold">{examData.cutoff}</p>
+   476→   476→                    </div>
+   477→   477→                    <div className="text-center">
+   478→   478→                      <p className="text-muted-foreground text-xs">Gap</p>
+   479→   479→                      <p className={`font-semibold ${examData.cutoffGap != null && examData.cutoffGap < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+   480→   480→                        {examData.cutoffGap != null ? `${examData.cutoffGap > 0 ? '+' : ''}${examData.cutoffGap}` : '—'}
+   481→   481→                      </p>
+   482→   482→                    </div>
+   483→   483→                    <Badge
+   484→   484→                      variant={examData.result === 'Qualified' || examData.result === 'qualified' ? 'default' : 'destructive'}
+   485→   485→                      className={examData.result === 'Qualified' || examData.result === 'qualified' ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600' : ''}
+   486→   486→                    >
+   487→   487→                      {examData.result}
+   488→   488→                    </Badge>
+   489→   489→                  </div>
+   490→   490→                </div>
+   491→   491→              ) : null}
+   492→   492→            </CardContent>
+   493→   493→          </Card>
+   494→   494→
+   495→   495→          {/* 1. Exam Experience */}
+   496→   496→          <Card>
+   497→   497→            <CardHeader className="pb-3">
+   498→   498→              <CardTitle className="text-base">1. Exam Experience</CardTitle>
+   499→   499→            </CardHeader>
+   500→   500→            <CardContent className="space-y-5">
+   501→   501→              <div className="space-y-2">
+   502→   502→                <Label>Difficulty Level</Label>
+   503→   503→                <div className="flex flex-wrap gap-2">
+   504→   504→                  {DIFFICULTY_OPTIONS.map((d) => (
+   505→   505→                    <ToggleButton
+   506→   506→                      key={d}
+   507→   507→                      label={d}
+   508→   508→                      active={difficulty === d}
+   509→   509→                      onClick={() => setDifficulty(difficulty === d ? '' : d)}
+   510→   510→                    />
+   511→   511→                  ))}
+   512→   512→                </div>
+   513→   513→              </div>
+   514→   514→              <div className="space-y-3">
+   515→   515→                <div className="flex items-center justify-between">
+   516→   516→                  <Label>Confidence Level</Label>
+   517→   517→                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+   518→   518→                    {confidence}%
+   519→   519→                  </span>
+   520→   520→                </div>
+   521→   521→                <Slider
+   522→   522→                  value={[confidence]}
+   523→   523→                  onValueChange={(v) => setConfidence(v[0])}
+   524→   524→                  min={0}
+   525→   525→                  max={100}
+   526→   526→                  step={5}
+   527→   527→                  className="[&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:border-emerald-500"
+   528→   528→                />
+   529→   529→                <div className="flex justify-between text-xs text-muted-foreground">
+   530→   530→                  <span>Not Confident</span>
+   531→   531→                  <span>Very Confident</span>
+   532→   532→                </div>
+   533→   533→              </div>
+   534→   534→              <div className="space-y-2">
+   535→   535→                <Label>Emotional State</Label>
+   536→   536→                <div className="flex flex-wrap gap-2">
+   537→   537→                  {EMOTIONAL_OPTIONS.map((e) => (
+   538→   538→                    <ToggleButton
+   539→   539→                      key={e}
+   540→   540→                      label={e}
+   541→   541→                      active={emotionalState === e}
+   542→   542→                      onClick={() => setEmotionalState(emotionalState === e ? '' : e)}
+   543→   543→                    />
+   544→   544→                  ))}
+   545→   545→                </div>
+   546→   546→              </div>
+   547→   547→            </CardContent>
+   548→   548→          </Card>
+   549→   549→
+   550→   550→          {/* 2. Mistake Tags */}
+   551→   551→          <Card>
+   552→   552→            <CardHeader className="pb-3">
+   553→   553→              <CardTitle className="text-base">2. Mistake Tags</CardTitle>
+   554→   554→              <p className="text-xs text-muted-foreground">Select the mistakes you made</p>
+   555→   555→            </CardHeader>
+   556→   556→            <CardContent>
+   557→   557→              <div className="flex flex-wrap gap-2">
+   558→   558→                {MISTAKE_TAG_OPTIONS.map((tag) => (
+   559→   559→                  <ToggleButton
+   560→   560→                    key={tag}
+   561→   561→                    label={tag}
+   562→   562→                    active={mistakeTags.includes(tag)}
+   563→   563→                    onClick={() => toggleTag(tag, mistakeTags, setMistakeTags)}
+   564→   564→                  />
+   565→   565→                ))}
+   566→   566→              </div>
+   567→   567→            </CardContent>
+   568→   568→          </Card>
+   569→   569→
+   570→   570→          {/* 3. Strength Tags */}
+   571→   571→          <Card>
+   572→   572→            <CardHeader className="pb-3">
+   573→   573→              <CardTitle className="text-base">3. Strength Tags</CardTitle>
+   574→   574→              <p className="text-xs text-muted-foreground">Select areas where you performed well</p>
+   575→   575→            </CardHeader>
+   576→   576→            <CardContent>
+   577→   577→              <div className="flex flex-wrap gap-2">
+   578→   578→                {STRENGTH_TAG_OPTIONS.map((tag) => (
+   579→   579→                  <ToggleButton
+   580→   580→                    key={tag}
+   581→   581→                    label={tag}
+   582→   582→                    active={strengthTags.includes(tag)}
+   583→   583→                    onClick={() => toggleTag(tag, strengthTags, setStrengthTags)}
+   584→   584→                  />
+   585→   585→                ))}
+   586→   586→              </div>
+   587→   587→            </CardContent>
+   588→   588→          </Card>
+   589→   589→
+   590→   590→          {/* 4. What Went Wrong */}
+   591→   591→          <Card>
+   592→   592→            <CardHeader className="pb-3">
+   593→   593→              <CardTitle className="text-base">4. What Went Wrong</CardTitle>
+   594→   594→            </CardHeader>
+   595→   595→            <CardContent>
+   596→   596→              <Textarea
+   597→   597→                placeholder="Describe what didn't go as planned..."
+   598→   598→                value={whatWentWrong}
+   599→   599→                onChange={(e) => setWhatWentWrong(e.target.value)}
+   600→   600→                rows={4}
+   601→   601→                className="resize-none"
+   602→   602→              />
+   603→   603→            </CardContent>
+   604→   604→          </Card>
+   605→   605→
+   606→   606→          {/* 5. What Went Well */}
+   607→   607→          <Card>
+   608→   608→            <CardHeader className="pb-3">
+   609→   609→              <CardTitle className="text-base">5. What Went Well</CardTitle>
+   610→   610→            </CardHeader>
+   611→   611→            <CardContent>
+   612→   612→              <Textarea
+   613→   613→                placeholder="Describe what went well..."
+   614→   614→                value={whatWentWell}
+   615→   615→                onChange={(e) => setWhatWentWell(e.target.value)}
+   616→   616→                rows={4}
+   617→   617→                className="resize-none"
+   618→   618→              />
+   619→   619→            </CardContent>
+   620→   620→          </Card>
+   621→   621→
+   622→   622→          {/* 6. Biggest Lesson */}
+   623→   623→          <Card>
+   624→   624→            <CardHeader className="pb-3">
+   625→   625→              <CardTitle className="text-base">6. Biggest Lesson</CardTitle>
+   626→   626→            </CardHeader>
+   627→   627→            <CardContent>
+   628→   628→              <Textarea
+   629→   629→                placeholder="What's the most important thing you learned from this exam?"
+   630→   630→                value={biggestLesson}
+   631→   631→                onChange={(e) => setBiggestLesson(e.target.value)}
+   632→   632→                rows={3}
+   633→   633→                className="resize-none"
+   634→   634→              />
+   635→   635→            </CardContent>
+   636→   636→          </Card>
+   637→   637→
+   638→   638→          {/* 7. Action Plan */}
+   639→   639→          <Card>
+   640→   640→            <CardHeader className="pb-3">
+   641→   641→              <CardTitle className="text-base">7. Action Plan</CardTitle>
+   642→   642→            </CardHeader>
+   643→   643→            <CardContent>
+   644→   644→              <Textarea
+   645→   645→                placeholder="What specific actions will you take before the next attempt?"
+   646→   646→                value={actionPlan}
+   647→   647→                onChange={(e) => setActionPlan(e.target.value)}
+   648→   648→                rows={4}
+   649→   649→                className="resize-none"
+   650→   650→              />
+   651→   651→            </CardContent>
+   652→   652→          </Card>
+   653→   653→
+   654→   654→          {/* 8. Next Attempt Goal */}
+   655→   655→          <Card>
+   656→   656→            <CardHeader className="pb-3">
+   657→   657→              <CardTitle className="text-base">8. Next Attempt Goal</CardTitle>
+   658→   658→            </CardHeader>
+   659→   659→            <CardContent className="space-y-4">
+   660→   660→              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   661→   661→                <div className="space-y-2">
+   662→   662→                  <Label>Target Score</Label>
+   663→   663→                  <Input
+   664→   664→                    type="number"
+   665→   665→                    placeholder="e.g. 85"
+   666→   666→                    value={targetScore}
+   667→   667→                    onChange={(e) => setTargetScore(e.target.value)}
+   668→   668→                  />
+   669→   669→                </div>
+   670→   670→                <div className="space-y-2">
+   671→   671→                  <Label>Current Score</Label>
+   672→   672→                  <Input
+   673→   673→                    type="text"
+   674→   674→                    value={examData?.score ?? '—'}
+   675→   675→                    disabled
+   676→   676→                    className="bg-muted"
+   677→   677→                  />
+   678→   678→                </div>
+   679→   679→              </div>
+   680→   680→              <div className="space-y-2">
+   681→   681→                <Label>Goal Description</Label>
+   682→   682→                <Textarea
+   683→   683→                  placeholder="Describe your goal for the next attempt..."
+   684→   684→                  value={goalDescription}
+   685→   685→                  onChange={(e) => setGoalDescription(e.target.value)}
+   686→   686→                  rows={3}
+   687→   687→                  className="resize-none"
+   688→   688→                />
+   689→   689→              </div>
+   690→   690→            </CardContent>
+   691→   691→          </Card>
+   692→   692→
+   693→   693→          {/* 9. Section-wise Reflection */}
+   694→   694→          <Card>
+   695→   695→            <CardHeader className="pb-3">
+   696→   696→              <CardTitle className="text-base">9. Section-wise Reflection</CardTitle>
+   697→   697→              <p className="text-xs text-muted-foreground">
+   698→   698→                Analyze each section of the exam
+   699→   699→              </p>
+   700→   700→            </CardHeader>
+   701→   701→            <CardContent>
+   702→   702→              {sectionReflections.length === 0 ? (
+   703→   703→                <p className="text-sm text-muted-foreground py-4 text-center">
+   704→   704→                  No sectional data available for this exam.
+   705→   705→                </p>
+   706→   706→              ) : (
+   707→   707→                <div className="overflow-x-auto -mx-2">
+   708→   708→                  <Table>
+   709→   709→                    <TableHeader>
+   710→   710→                      <TableRow>
+   711→   711→                        <TableHead className="min-w-[120px]">Section</TableHead>
+   712→   712→                        <TableHead className="min-w-[80px]">Score</TableHead>
+   713→   713→                        <TableHead className="min-w-[140px]">Strength</TableHead>
+   714→   714→                        <TableHead className="min-w-[140px]">Weakness</TableHead>
+   715→   715→                        <TableHead className="min-w-[160px]">Action Plan</TableHead>
+   716→   716→                      </TableRow>
+   717→   717→                    </TableHeader>
+   718→   718→                    <TableBody>
+   719→   719→                      {sectionReflections.map((sec, idx) => (
+   720→   720→                        <TableRow key={sec.section}>
+   721→   721→                          <TableCell className="font-medium text-sm">
+   722→   722→                            {sec.section}
+   723→   723→                          </TableCell>
+   724→   724→                          <TableCell>
+   725→   725→                            <Input
+   726→   726→                              type="number"
+   727→   727→                              placeholder="—"
+   728→   728→                              value={sec.score}
+   729→   729→                              onChange={(e) => updateSection(idx, 'score', e.target.value)}
+   730→   730→                              className="h-8 w-20 text-sm"
+   731→   731→                            />
+   732→   732→                          </TableCell>
+   733→   733→                          <TableCell>
+   734→   734→                            <Input
+   735→   735→                              placeholder="Strength..."
+   736→   736→                              value={sec.strength}
+   737→   737→                              onChange={(e) => updateSection(idx, 'strength', e.target.value)}
+   738→   738→                              className="h-8 text-sm"
+   739→   739→                            />
+   740→   740→                          </TableCell>
+   741→   741→                          <TableCell>
+   742→   742→                            <Input
+   743→   743→                              placeholder="Weakness..."
+   744→   744→                              value={sec.weakness}
+   745→   745→                              onChange={(e) => updateSection(idx, 'weakness', e.target.value)}
+   746→   746→                              className="h-8 text-sm"
+   747→   747→                            />
+   748→   748→                          </TableCell>
+   749→   749→                          <TableCell>
+   750→   750→                            <Input
+   751→   751→                              placeholder="Action plan..."
+   752→   752→                              value={sec.actionPlan}
+   753→   753→                              onChange={(e) => updateSection(idx, 'actionPlan', e.target.value)}
+   754→   754→                              className="h-8 text-sm"
+   755→   755→                            />
+   756→   756→                          </TableCell>
+   757→   757→                        </TableRow>
+   758→   758→                      ))}
+   759→   759→                    </TableBody>
+   760→   760→                  </Table>
+   761→   761→                </div>
+   762→   762→              )}
+   763→   763→            </CardContent>
+   764→   764→          </Card>
+   765→   765→
+   766→   766→          {/* 10. Attachments */}
+   767→   767→          <Card>
+   768→   768→            <CardHeader className="pb-3">
+   769→   769→              <CardTitle className="text-base">10. Attachments</CardTitle>
+   770→   770→              <p className="text-xs text-muted-foreground">
+   771→   771→                Add notes, screenshots, or reference materials
+   772→   772→              </p>
+   773→   773→            </CardHeader>
+   774→   774→            <CardContent className="space-y-4">
+   775→   775→              <div
+   776→   776→                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5 cursor-pointer"
+   777→   777→                onClick={() => {
+   778→   778→                  const name = `attachment-${attachments.length + 1}.png`;
+   779→   779→                  addAttachment(name);
+   780→   780→                  toast.success(`Added ${name}`);
+   781→   781→                }}
+   782→   782→              >
+   783→   783→                <Upload className="size-8 text-muted-foreground" />
+   784→   784→                <p className="text-sm text-muted-foreground">
+   785→   785→                  Click to add attachment
+   786→   786→                </p>
+   787→   787→              </div>
+   788→   788→              {attachments.length > 0 && (
+   789→   789→                <div className="space-y-2">
+   790→   790→                  {attachments.map((file, idx) => (
+   791→   791→                    <div
+   792→   792→                      key={idx}
+   793→   793→                      className="flex items-center justify-between rounded-lg border p-2.5"
+   794→   794→                    >
+   795→   795→                      <div className="flex items-center gap-2">
+   796→   796→                        <FileText className="size-4 text-muted-foreground" />
+   797→   797→                        <span className="text-sm">{file}</span>
+   798→   798→                      </div>
+   799→   799→                      <Button
+   800→   800→                        variant="ghost"
+   801→   801→                        size="sm"
+   802→   802→                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+   803→   803→                        onClick={() => removeAttachment(idx)}
+   804→   804→                      >
+   805→   805→                        <X className="size-3.5" />
+   806→   806→                      </Button>
+   807→   807→                    </div>
+   808→   808→                  ))}
+   809→   809→                </div>
+   810→   810→              )}
+   811→   811→            </CardContent>
+   812→   812→          </Card>
+   813→   813→
+   814→   814→          {/* 11. Reminder */}
+   815→   815→          <Card>
+   816→   816→            <CardHeader className="pb-3">
+   817→   817→              <CardTitle className="text-base">11. Reminder</CardTitle>
+   818→   818→              <p className="text-xs text-muted-foreground">
+   819→   819→                Set a reminder for your next study session or exam prep
+   820→   820→              </p>
+   821→   821→            </CardHeader>
+   822→   822→            <CardContent className="space-y-4">
+   823→   823→              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   824→   824→                <div className="space-y-2">
+   825→   825→                  <Label>Reminder Type</Label>
+   826→   826→                  <Select value={reminderType} onValueChange={setReminderType}>
+   827→   827→                    <SelectTrigger className="w-full">
+   828→   828→                      <SelectValue placeholder="Select..." />
+   829→   829→                    </SelectTrigger>
+   830→   830→                    <SelectContent>
+   831→   831→                      {REMINDER_TYPE_OPTIONS.map((opt) => (
+   832→   832→                        <SelectItem key={opt} value={opt}>
+   833→   833→                          {opt}
+   834→   834→                        </SelectItem>
+   835→   835→                      ))}
+   836→   836→                    </SelectContent>
+   837→   837→                  </Select>
+   838→   838→                </div>
+   839→   839→                <div className="space-y-2">
+   840→   840→                  <Label>Reminder Date</Label>
+   841→   841→                  <Input
+   842→   842→                    type="date"
+   843→   843→                    value={reminderDate}
+   844→   844→                    onChange={(e) => setReminderDate(e.target.value)}
+   845→   845→                  />
+   846→   846→                </div>
+   847→   847→              </div>
+   848→   848→            </CardContent>
+   849→   849→          </Card>
+   850→   850→
+   851→   851→          {/* ── Footer Buttons ─────────────────────────────── */}
+   852→   852→          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
+   853→   853→            <Button
+   854→   854→              variant="outline"
+   855→   855→              onClick={handleCancel}
+   856→   856→              className="min-w-[120px]"
+   857→   857→            >
+   858→   858→              Cancel
+   859→   859→            </Button>
+   860→   860→            <Button
+   861→   861→              onClick={handleSave}
+   862→   862→              disabled={saveMutation.isPending}
+   863→   863→              className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white"
+   864→   864→            >
+   865→   865→              <Save className="mr-2 size-4" />
+   866→   866→              {saveMutation.isPending
+   867→   867→                ? 'Saving...'
+   868→   868→                : editingId
+   869→   869→                  ? 'Update Reflection'
+   870→   870→                  : 'Save Reflection'}
+   871→   871→            </Button>
+   872→   872→          </div>
+   873→   873→        </div>
+   874→   874→      )}
+   875→   875→    </div>
+   876→   876→  );
+   877→   877→}

@@ -309,7 +309,7 @@ export default function SettingsPage() {
                   {accentColors.map((c) => (
                     <button
                       key={c.name}
-                      onClick={() => { setSelectedAccent(c.name); handleSelectChange('accentColor', c.name); }}
+                      onClick={() => handleSelectChange('accentColor', c.name)}
                       className={cn(
                         'size-8 rounded-full transition-all',
                         c.class,

@@ -1,0 +1,956 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo } from 'react';
+     4→import {
+     5→  useQuery,
+     6→  useMutation,
+     7→  useQueryClient,
+     8→} from '@tanstack/react-query';
+     9→import { toast } from 'sonner';
+    10→import {
+    11→  Upload,
+    12→  Search,
+    13→  Plus,
+    14→  Eye,
+    15→  Download,
+    16→  MoreHorizontal,
+    17→  Trash2,
+    18→  FileText,
+    19→  FolderOpen,
+    20→  Clock,
+    21→  HardDrive,
+    22→  ChevronLeft,
+    23→  ChevronRight,
+    24→  Filter,
+    25→  X,
+    26→  File,
+    27→  ArrowUpDown,
+    28→} from 'lucide-react';
+    29→import {
+    30→  getDocuments,
+    31→  getDocumentStats,
+    32→  createDocument,
+    33→  deleteDocument,
+    34→  getReflectionExamOptions,
+    35→  type Document as DocType,
+    36→  type DocumentStats as DocStats,
+    37→} from '@/lib/api';
+    38→
+    39→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    40→import { Button } from '@/components/ui/button';
+    41→import { Label } from '@/components/ui/label';
+    42→import { Input } from '@/components/ui/input';
+    43→import { Textarea } from '@/components/ui/textarea';
+    44→import { Badge } from '@/components/ui/badge';
+    45→import { Skeleton } from '@/components/ui/skeleton';
+    46→import { Progress } from '@/components/ui/progress';
+    47→import {
+    48→  Select,
+    49→  SelectContent,
+    50→  SelectItem,
+    51→  SelectTrigger,
+    52→  SelectValue,
+    53→} from '@/components/ui/select';
+    54→import {
+    55→  Table,
+    56→  TableBody,
+    57→  TableCell,
+    58→  TableHead,
+    59→  TableHeader,
+    60→  TableRow,
+    61→} from '@/components/ui/table';
+    62→import {
+    63→  Dialog,
+    64→  DialogContent,
+    65→  DialogHeader,
+    66→  DialogTitle,
+    67→  DialogDescription,
+    68→  DialogFooter,
+    69→  DialogTrigger,
+    70→} from '@/components/ui/dialog';
+    71→import {
+    72→  AlertDialog,
+    73→  AlertDialogAction,
+    74→  AlertDialogCancel,
+    75→  AlertDialogContent,
+    76→  AlertDialogDescription,
+    77→  AlertDialogFooter,
+    78→  AlertDialogHeader,
+    79→  AlertDialogTitle,
+    80→} from '@/components/ui/alert-dialog';
+    81→import {
+    82→  DropdownMenu,
+    83→  DropdownMenuContent,
+    84→  DropdownMenuItem,
+    85→  DropdownMenuSeparator,
+    86→  DropdownMenuTrigger,
+    87→} from '@/components/ui/dropdown-menu';
+    88→
+    89→// ── Constants ────────────────────────────────────────────────
+    90→const CATEGORIES = [
+    91→  { label: 'Scorecard', icon: '📊' },
+    92→  { label: 'Admit Card', icon: '🎫' },
+    93→  { label: 'Result', icon: '📋' },
+    94→  { label: 'Question Paper', icon: '📝' },
+    95→  { label: 'Answer Key', icon: '🔑' },
+    96→  { label: 'Syllabus', icon: '📚' },
+    97→  { label: 'Notes', icon: '🗒️' },
+    98→  { label: 'Misc', icon: '📎' },
+    99→] as const;
+   100→
+   101→const CATEGORY_OPTIONS = CATEGORIES.map((c) => c.label);
+   102→const YEAR_OPTIONS = ['2024', '2025', '2026'];
+   103→const SORT_OPTIONS = [
+   104→  { label: 'Newest First', value: 'newest' },
+   105→  { label: 'Oldest First', value: 'oldest' },
+   106→  { label: 'Name A-Z', value: 'name-asc' },
+   107→  { label: 'Name Z-A', value: 'name-desc' },
+   108→  { label: 'Size (Largest)', value: 'size-desc' },
+   109→  { label: 'Size (Smallest)', value: 'size-asc' },
+   110→];
+   111→
+   112→const PAGE_SIZE = 10;
+   113→const TOTAL_STORAGE_GB = 10;
+   114→
+   115→// ── Utilities ────────────────────────────────────────────────
+   116→function formatFileSize(bytes: number | null): string {
+   117→  if (bytes == null) return '—';
+   118→  if (bytes === 0) return '0 B';
+   119→  const units = ['B', 'KB', 'MB', 'GB'];
+   120→  const k = 1024;
+   121→  const i = Math.floor(Math.log(bytes) / Math.log(k));
+   122→  const size = bytes / Math.pow(k, i);
+   123→  return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+   124→}
+   125→
+   126→function formatDate(dateStr: string): string {
+   127→  try {
+   128→    return new Date(dateStr).toLocaleDateString('en-IN', {
+   129→      day: '2-digit',
+   130→      month: 'short',
+   131→      year: 'numeric',
+   132→    });
+   133→  } catch {
+   134→    return dateStr;
+   135→  }
+   136→}
+   137→
+   138→function getCategoryIcon(category: string): string {
+   139→  return CATEGORIES.find((c) => c.label === category)?.icon ?? '📎';
+   140→}
+   141→
+   142→function getCategoryBadgeVariant(
+   143→  category: string
+   144→): 'default' | 'secondary' | 'outline' | 'destructive' {
+   145→  const map: Record<string, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+   146→    Scorecard: 'default',
+   147→    'Admit Card': 'secondary',
+   148→    Result: 'default',
+   149→    'Question Paper': 'outline',
+   150→    'Answer Key': 'outline',
+   151→    Syllabus: 'secondary',
+   152→    Notes: 'outline',
+   153→    Misc: 'secondary',
+   154→  };
+   155→  return map[category] ?? 'secondary';
+   156→}
+   157→
+   158→// ── Upload Form Sub-component ────────────────────────────────
+   159→function UploadForm({
+   160→  onUpload,
+   161→  onCancel,
+   162→  isPending,
+   163→}: {
+   164→  onUpload: (data: {
+   165→    name: string;
+   166→    category: string;
+   167→    examName?: string;
+   168→    year?: string;
+   169→    note?: string;
+   170→    fileSize?: number;
+   171→  }) => void;
+   172→  onCancel?: () => void;
+   173→  isPending: boolean;
+   174→}) {
+   175→  const [name, setName] = useState('');
+   176→  const [category, setCategory] = useState('');
+   177→  const [examName, setExamName] = useState('');
+   178→  const [year, setYear] = useState('');
+   179→  const [note, setNote] = useState('');
+   180→  const [fileName, setFileName] = useState('');
+   181→  const [fileSize, setFileSize] = useState(0);
+   182→
+   183→  const { data: examOptions } = useQuery({
+   184→    queryKey: ['exam-options-docs'],
+   185→    queryFn: getReflectionExamOptions,
+   186→  });
+   187→
+   188→  const handleDrop = () => {
+   189→    // Simulate a file drop
+   190→    const ext = 'pdf';
+   191→    const fakeName = `document-${Date.now().toString(36)}.${ext}`;
+   192→    setFileName(fakeName);
+   193→    setName(name || fakeName);
+   194→    setFileSize(Math.floor(Math.random() * 5000000) + 100000); // 100KB - 5MB
+   195→  };
+   196→
+   197→  const handleSubmit = () => {
+   198→    if (!name.trim() || !category) {
+   199→      toast.error('Please fill in document name and category');
+   200→      return;
+   201→    }
+   202→    onUpload({
+   203→      name: name.trim(),
+   204→      category,
+   205→      examName: examName || undefined,
+   206→      year: year || undefined,
+   207→      note: note || undefined,
+   208→      fileSize: fileSize || undefined,
+   209→    });
+   210→  };
+   211→
+   212→  return (
+   213→    <div className="space-y-4">
+   214→      {/* Drag & Drop Zone */}
+   215→      <div
+   216→        onClick={handleDrop}
+   217→        className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5 cursor-pointer"
+   218→      >
+   219→        <Upload className="size-8 text-muted-foreground" />
+   220→        <p className="text-sm text-muted-foreground">
+   221→          {fileName ? `📎 ${fileName} (${formatFileSize(fileSize)})` : 'Click to select a file'}
+   222→        </p>
+   223→      </div>
+   224→
+   225→      {/* Name */}
+   226→      <div className="space-y-2">
+   227→        <Label>Document Name</Label>
+   228→        <Input
+   229→          placeholder="e.g. IBPS PO 2024 Scorecard"
+   230→          value={name}
+   231→          onChange={(e) => setName(e.target.value)}
+   232→        />
+   233→      </div>
+   234→
+   235→      {/* Category & Year */}
+   236→      <div className="grid grid-cols-2 gap-3">
+   237→        <div className="space-y-2">
+   238→          <Label>Category</Label>
+   239→          <Select value={category} onValueChange={setCategory}>
+   240→            <SelectTrigger className="w-full">
+   241→              <SelectValue placeholder="Select..." />
+   242→            </SelectTrigger>
+   243→            <SelectContent>
+   244→              {CATEGORY_OPTIONS.map((c) => (
+   245→                <SelectItem key={c} value={c}>
+   246→                  {getCategoryIcon(c)} {c}
+   247→                </SelectItem>
+   248→              ))}
+   249→            </SelectContent>
+   250→          </Select>
+   251→        </div>
+   252→        <div className="space-y-2">
+   253→          <Label>Year</Label>
+   254→          <Select value={year} onValueChange={setYear}>
+   255→            <SelectTrigger className="w-full">
+   256→              <SelectValue placeholder="Select..." />
+   257→            </SelectTrigger>
+   258→            <SelectContent>
+   259→              {YEAR_OPTIONS.map((y) => (
+   260→                <SelectItem key={y} value={y}>
+   261→                  {y}
+   262→                </SelectItem>
+   263→              ))}
+   264→            </SelectContent>
+   265→          </Select>
+   266→        </div>
+   267→      </div>
+   268→
+   269→      {/* Link to Exam */}
+   270→      <div className="space-y-2">
+   271→        <Label>Link to Exam (Optional)</Label>
+   272→        <Select value={examName} onValueChange={setExamName}>
+   273→          <SelectTrigger className="w-full">
+   274→            <SelectValue placeholder="Select exam..." />
+   275→          </SelectTrigger>
+   276→          <SelectContent>
+   277→            {examOptions?.map((e) => (
+   278→              <SelectItem key={e.id} value={e.name}>
+   279→                {e.name}
+   280→              </SelectItem>
+   281→            ))}
+   282→          </SelectContent>
+   283→        </Select>
+   284→      </div>
+   285→
+   286→      {/* Notes */}
+   287→      <div className="space-y-2">
+   288→        <Label>Notes (Optional)</Label>
+   289→        <Textarea
+   290→          placeholder="Add any notes..."
+   291→          value={note}
+   292→          onChange={(e) => setNote(e.target.value)}
+   293→          rows={3}
+   294→          className="resize-none"
+   295→        />
+   296→      </div>
+   297→
+   298→      {/* Actions */}
+   299→      <div className="flex justify-end gap-2 pt-2">
+   300→        {onCancel && (
+   301→          <Button variant="outline" onClick={onCancel}>
+   302→            Cancel
+   303→          </Button>
+   304→        )}
+   305→        <Button
+   306→          onClick={handleSubmit}
+   307→          disabled={isPending}
+   308→          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   309→        >
+   310→          <Upload className="mr-2 size-4" />
+   311→          {isPending ? 'Uploading...' : 'Upload'}
+   312→        </Button>
+   313→      </div>
+   314→    </div>
+   315→  );
+   316→}
+   317→
+   318→// ── Main Component ───────────────────────────────────────────
+   319→export default function DocumentsPage() {
+   320→  const queryClient = useQueryClient();
+   321→
+   322→  // Filters
+   323→  const [search, setSearch] = useState('');
+   324→  const [categoryFilter, setCategoryFilter] = useState('');
+   325→  const [yearFilter, setYearFilter] = useState('');
+   326→  const [sort, setSort] = useState('newest');
+   327→  const [page, setPage] = useState(1);
+   328→
+   329→  // Dialog state
+   330→  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+   331→  const [deleteTarget, setDeleteTarget] = useState<DocType | null>(null);
+   332→  const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
+   333→
+   334→  // ── Queries ─────────────────────────────────────────────
+   335→  const { data: docsData, isLoading: loadingDocs } = useQuery({
+   336→    queryKey: ['documents', { search, categoryFilter, yearFilter, sort, page }],
+   337→    queryFn: () =>
+   338→      getDocuments({
+   339→        search: search || undefined,
+   340→        category: categoryFilter || undefined,
+   341→        year: yearFilter || undefined,
+   342→        sort,
+   343→        page,
+   344→        limit: PAGE_SIZE,
+   345→      }),
+   346→  });
+   347→
+   348→  const { data: stats, isLoading: loadingStats } = useQuery({
+   349→    queryKey: ['document-stats'],
+   350→    queryFn: getDocumentStats,
+   351→  });
+   352→
+   353→  // ── Mutations ───────────────────────────────────────────
+   354→  const uploadMutation = useMutation({
+   355→    mutationFn: createDocument,
+   356→    onSuccess: () => {
+   357→      toast.success('Document uploaded successfully!');
+   358→      queryClient.invalidateQueries({ queryKey: ['documents'] });
+   359→      queryClient.invalidateQueries({ queryKey: ['document-stats'] });
+   360→      setUploadDialogOpen(false);
+   361→    },
+   362→    onError: (err: Error) => {
+   363→      toast.error(err.message || 'Failed to upload document');
+   364→    },
+   365→  });
+   366→
+   367→  const deleteMutation = useMutation({
+   368→    mutationFn: deleteDocument,
+   369→    onSuccess: () => {
+   370→      toast.success('Document deleted');
+   371→      queryClient.invalidateQueries({ queryKey: ['documents'] });
+   372→      queryClient.invalidateQueries({ queryKey: ['document-stats'] });
+   373→      setDeleteTarget(null);
+   374→    },
+   375→    onError: (err: Error) => {
+   376→      toast.error(err.message || 'Failed to delete document');
+   377→    },
+   378→  });
+   379→
+   380→  const handleUpload = (data: Parameters<typeof createDocument>[0]) => {
+   381→    uploadMutation.mutate(data);
+   382→  };
+   383→
+   384→  // ── Computed ────────────────────────────────────────────
+   385→  const documents = docsData?.data ?? [];
+   386→  const pagination = docsData?.pagination ?? { page: 1, limit: PAGE_SIZE, total: 0, pages: 0 };
+   387→  const categoryCounts = useMemo(() => {
+   388→    const map = new Map<string, number>();
+   389→    stats?.categories?.forEach((c) => map.set(c.label, c.count));
+   390→    return map;
+   391→  }, [stats]);
+   392→
+   393→  const storageUsedGB = stats?.totalSize
+   394→    ? (stats.totalSize / (1024 * 1024 * 1024)).toFixed(2)
+   395→    : '0.00';
+   396→  const storagePercent = Math.min(
+   397→    ((stats?.totalSize ?? 0) / (TOTAL_STORAGE_GB * 1024 * 1024 * 1024)) * 100,
+   398→    100
+   399→  );
+   400→
+   401→  const startItem = (page - 1) * PAGE_SIZE + 1;
+   402→  const endItem = Math.min(page * PAGE_SIZE, pagination.total);
+   403→
+   404→  // ── Loading ─────────────────────────────────────────────
+   405→  if (loadingDocs && loadingStats) {
+   406→    return (
+   407→      <div className="space-y-6 p-4 md:p-6">
+   408→        <div className="flex items-center justify-between">
+   409→          <Skeleton className="h-8 w-48" />
+   410→          <Skeleton className="h-9 w-36" />
+   411→        </div>
+   412→        <Skeleton className="h-12 w-full" />
+   413→        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+   414→          {Array.from({ length: 8 }).map((_, i) => (
+   415→            <Skeleton key={i} className="h-20" />
+   416→          ))}
+   417→        </div>
+   418→        <Skeleton className="h-64 w-full" />
+   419→      </div>
+   420→    );
+   421→  }
+   422→
+   423→  return (
+   424→    <div className="space-y-6 p-4 md:p-6">
+   425→      {/* ── Header ──────────────────────────────────────── */}
+   426→      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   427→        <div>
+   428→          <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
+   429→          <p className="text-sm text-muted-foreground">
+   430→            Manage your exam-related documents
+   431→          </p>
+   432→        </div>
+   433→        <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+   434→          <DialogTrigger asChild>
+   435→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+   436→              <Upload className="mr-2 size-4" />
+   437→              Upload Document
+   438→            </Button>
+   439→          </DialogTrigger>
+   440→          <DialogContent className="sm:max-w-md">
+   441→            <DialogHeader>
+   442→              <DialogTitle>Upload Document</DialogTitle>
+   443→              <DialogDescription>
+   444→                Add a new document to your collection.
+   445→              </DialogDescription>
+   446→            </DialogHeader>
+   447→            <UploadForm
+   448→              onUpload={handleUpload}
+   449→              onCancel={() => setUploadDialogOpen(false)}
+   450→              isPending={uploadMutation.isPending}
+   451→            />
+   452→          </DialogContent>
+   453→        </Dialog>
+   454→      </div>
+   455→
+   456→      {/* ── Search & Filter Bar ─────────────────────────── */}
+   457→      <Card>
+   458→        <CardContent className="p-3">
+   459→          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+   460→            <div className="relative flex-1">
+   461→              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+   462→              <Input
+   463→                placeholder="Search documents..."
+   464→                value={search}
+   465→                onChange={(e) => {
+   466→                  setSearch(e.target.value);
+   467→                  setPage(1);
+   468→                }}
+   469→                className="pl-9"
+   470→              />
+   471→            </div>
+   472→            <div className="flex items-center gap-2">
+   473→              <Select
+   474→                value={categoryFilter}
+   475→                onValueChange={(v) => {
+   476→                  setCategoryFilter(v === '__all' ? '' : v);
+   477→                  setPage(1);
+   478→                }}
+   479→              >
+   480→                <SelectTrigger className="w-[140px]">
+   481→                  <SelectValue placeholder="Category" />
+   482→                </SelectTrigger>
+   483→                <SelectContent>
+   484→                  <SelectItem value="__all">All Categories</SelectItem>
+   485→                  {CATEGORY_OPTIONS.map((c) => (
+   486→                    <SelectItem key={c} value={c}>
+   487→                      {getCategoryIcon(c)} {c}
+   488→                    </SelectItem>
+   489→                  ))}
+   490→                </SelectContent>
+   491→              </Select>
+   492→
+   493→              <Select
+   494→                value={yearFilter}
+   495→                onValueChange={(v) => {
+   496→                  setYearFilter(v === '__all' ? '' : v);
+   497→                  setPage(1);
+   498→                }}
+   499→              >
+   500→                <SelectTrigger className="w-[100px]">
+   501→                  <SelectValue placeholder="Year" />
+   502→                </SelectTrigger>
+   503→                <SelectContent>
+   504→                  <SelectItem value="__all">All Years</SelectItem>
+   505→                  {YEAR_OPTIONS.map((y) => (
+   506→                    <SelectItem key={y} value={y}>
+   507→                      {y}
+   508→                    </SelectItem>
+   509→                  ))}
+   510→                </SelectContent>
+   511→              </Select>
+   512→
+   513→              <Select value={sort} onValueChange={setSort}>
+   514→                <SelectTrigger className="w-[150px]">
+   515→                  <ArrowUpDown className="mr-1.5 size-3.5" />
+   516→                  <SelectValue />
+   517→                </SelectTrigger>
+   518→                <SelectContent>
+   519→                  {SORT_OPTIONS.map((s) => (
+   520→                    <SelectItem key={s.value} value={s.value}>
+   521→                      {s.label}
+   522→                    </SelectItem>
+   523→                  ))}
+   524→                </SelectContent>
+   525→              </Select>
+   526→
+   527→              {(search || categoryFilter || yearFilter) && (
+   528→                <Button
+   529→                  variant="ghost"
+   530→                  size="icon"
+   531→                  className="h-9 w-9 shrink-0"
+   532→                  onClick={() => {
+   533→                    setSearch('');
+   534→                    setCategoryFilter('');
+   535→                    setYearFilter('');
+   536→                    setPage(1);
+   537→                  }}
+   538→                  title="Clear filters"
+   539→                >
+   540→                  <X className="size-4" />
+   541→                </Button>
+   542→              )}
+   543→            </div>
+   544→          </div>
+   545→        </CardContent>
+   546→      </Card>
+   547→
+   548→      {/* ── Category Cards ──────────────────────────────── */}
+   549→      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   550→        {CATEGORIES.map((cat) => {
+   551→          const count = categoryCounts.get(cat.label) ?? 0;
+   552→          const isActive = categoryFilter === cat.label;
+   553→          return (
+   554→            <button
+   555→              key={cat.label}
+   556→              onClick={() => {
+   557→                if (isActive) {
+   558→                  setCategoryFilter('');
+   559→                } else {
+   560→                  setCategoryFilter(cat.label);
+   561→                }
+   562→                setPage(1);
+   563→              }}
+   564→              className={`rounded-xl border p-4 text-left transition-all hover:shadow-md ${
+   565→                isActive
+   566→                  ? 'border-emerald-500 bg-emerald-500/10 shadow-sm'
+   567→                  : 'hover:border-emerald-500/40'
+   568→              }`}
+   569→            >
+   570→              <div className="flex items-center justify-between">
+   571→                <span className="text-2xl">{cat.icon}</span>
+   572→                <span
+   573→                  className={`text-lg font-bold ${
+   574→                    isActive
+   575→                      ? 'text-emerald-600 dark:text-emerald-400'
+   576→                      : 'text-muted-foreground'
+   577→                  }`}
+   578→                >
+   579→                  {count}
+   580→                </span>
+   581→              </div>
+   582→              <p className="mt-2 text-sm font-medium leading-tight">{cat.label}</p>
+   583→            </button>
+   584→          );
+   585→        })}
+   586→      </div>
+   587→
+   588→      {/* ── Main Content: Table + Sidebar ───────────────── */}
+   589→      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_280px]">
+   590→        {/* Documents Table */}
+   591→        <Card>
+   592→          <CardHeader className="pb-3">
+   593→            <CardTitle className="text-base flex items-center gap-2">
+   594→              <FolderOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
+   595→              All Documents
+   596→            </CardTitle>
+   597→          </CardHeader>
+   598→          <CardContent className="p-0">
+   599→            {documents.length === 0 ? (
+   600→              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+   601→                <FileText className="size-12 text-muted-foreground/40" />
+   602→                <p className="text-sm text-muted-foreground">
+   603→                  {search || categoryFilter || yearFilter
+   604→                    ? 'No documents match your filters'
+   605→                    : 'No documents yet. Upload your first document!'}
+   606→                </p>
+   607→              </div>
+   608→            ) : (
+   609→              <>
+   610→                <div className="overflow-x-auto">
+   611→                  <Table>
+   612→                    <TableHeader>
+   613→                      <TableRow>
+   614→                        <TableHead className="min-w-[200px]">Name</TableHead>
+   615→                        <TableHead className="min-w-[120px] hidden sm:table-cell">Linked Exam</TableHead>
+   616→                        <TableHead className="min-w-[100px]">Category</TableHead>
+   617→                        <TableHead className="min-w-[100px] hidden md:table-cell">Uploaded</TableHead>
+   618→                        <TableHead className="min-w-[80px] hidden md:table-cell">Size</TableHead>
+   619→                        <TableHead className="min-w-[100px] text-right">Actions</TableHead>
+   620→                      </TableRow>
+   621→                    </TableHeader>
+   622→                    <TableBody>
+   623→                      {documents.map((doc) => (
+   624→                        <>
+   625→                          <TableRow
+   626→                            key={doc.id}
+   627→                            className="cursor-pointer"
+   628→                            onClick={() =>
+   629→                              setExpandedDoc(expandedDoc === doc.id ? null : doc.id)
+   630→                            }
+   631→                          >
+   632→                            <TableCell>
+   633→                              <div className="flex items-center gap-2">
+   634→                                <File className="size-4 shrink-0 text-muted-foreground" />
+   635→                                <div className="min-w-0">
+   636→                                  <p className="text-sm font-medium truncate">
+   637→                                    {doc.name}
+   638→                                  </p>
+   639→                                  <p className="text-xs text-muted-foreground sm:hidden">
+   640→                                    {doc.examName ?? '—'}
+   641→                                  </p>
+   642→                                </div>
+   643→                              </div>
+   644→                            </TableCell>
+   645→                            <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+   646→                              {doc.examName ?? '—'}
+   647→                            </TableCell>
+   648→                            <TableCell>
+   649→                              <Badge
+   650→                                variant={getCategoryBadgeVariant(doc.category)}
+   651→                                className={
+   652→                                  doc.category === 'Scorecard' || doc.category === 'Result'
+   653→                                    ? 'bg-emerald-600/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-600/20'
+   654→                                    : ''
+   655→                                }
+   656→                              >
+   657→                                {getCategoryIcon(doc.category)} {doc.category}
+   658→                              </Badge>
+   659→                            </TableCell>
+   660→                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+   661→                              {formatDate(doc.createdAt)}
+   662→                            </TableCell>
+   663→                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+   664→                              {formatFileSize(doc.fileSize)}
+   665→                            </TableCell>
+   666→                            <TableCell className="text-right">
+   667→                              <div className="flex items-center justify-end gap-1">
+   668→                                <Button
+   669→                                  variant="ghost"
+   670→                                  size="icon"
+   671→                                  className="h-8 w-8"
+   672→                                  onClick={(e) => {
+   673→                                    e.stopPropagation();
+   674→                                    setExpandedDoc(
+   675→                                      expandedDoc === doc.id ? null : doc.id
+   676→                                    );
+   677→                                  }}
+   678→                                  title="View details"
+   679→                                >
+   680→                                  <Eye className="size-3.5" />
+   681→                                </Button>
+   682→                                <Button
+   683→                                  variant="ghost"
+   684→                                  size="icon"
+   685→                                  className="h-8 w-8"
+   686→                                  onClick={(e) => e.stopPropagation()}
+   687→                                  title="Download"
+   688→                                >
+   689→                                  <Download className="size-3.5" />
+   690→                                </Button>
+   691→                                <DropdownMenu>
+   692→                                  <DropdownMenuTrigger asChild>
+   693→                                    <Button
+   694→                                      variant="ghost"
+   695→                                      size="icon"
+   696→                                      className="h-8 w-8"
+   697→                                      onClick={(e) => e.stopPropagation()}
+   698→                                    >
+   699→                                      <MoreHorizontal className="size-3.5" />
+   700→                                    </Button>
+   701→                                  </DropdownMenuTrigger>
+   702→                                  <DropdownMenuContent align="end">
+   703→                                    <DropdownMenuItem
+   704→                                      onClick={(e) => {
+   705→                                        e.stopPropagation();
+   706→                                        toast.info('Download started');
+   707→                                      }}
+   708→                                    >
+   709→                                      <Download className="mr-2 size-4" />
+   710→                                      Download
+   711→                                    </DropdownMenuItem>
+   712→                                    <DropdownMenuSeparator />
+   713→                                    <DropdownMenuItem
+   714→                                      className="text-red-600 dark:text-red-400 focus:text-red-600"
+   715→                                      onClick={(e) => {
+   716→                                        e.stopPropagation();
+   717→                                        setDeleteTarget(doc);
+   718→                                      }}
+   719→                                    >
+   720→                                      <Trash2 className="mr-2 size-4" />
+   721→                                      Delete
+   722→                                    </DropdownMenuItem>
+   723→                                  </DropdownMenuContent>
+   724→                                </DropdownMenu>
+   725→                              </div>
+   726→                            </TableCell>
+   727→                          </TableRow>
+   728→                          {/* Expanded row */}
+   729→                          {expandedDoc === doc.id && (
+   730→                            <TableRow key={`${doc.id}-expanded`}>
+   731→                              <TableCell colSpan={6} className="bg-muted/30 px-6 py-4">
+   732→                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   733→                                  <div>
+   734→                                    <p className="text-xs text-muted-foreground mb-1">Document Name</p>
+   735→                                    <p className="text-sm font-medium">{doc.name}</p>
+   736→                                  </div>
+   737→                                  <div>
+   738→                                    <p className="text-xs text-muted-foreground mb-1">Category</p>
+   739→                                    <Badge variant="secondary">{doc.category}</Badge>
+   740→                                  </div>
+   741→                                  <div>
+   742→                                    <p className="text-xs text-muted-foreground mb-1">Linked Exam</p>
+   743→                                    <p className="text-sm">{doc.examName ?? 'None'}</p>
+   744→                                  </div>
+   745→                                  <div>
+   746→                                    <p className="text-xs text-muted-foreground mb-1">Year</p>
+   747→                                    <p className="text-sm">{doc.year ?? '—'}</p>
+   748→                                  </div>
+   749→                                  <div>
+   750→                                    <p className="text-xs text-muted-foreground mb-1">Uploaded</p>
+   751→                                    <p className="text-sm">{formatDate(doc.createdAt)}</p>
+   752→                                  </div>
+   753→                                  <div>
+   754→                                    <p className="text-xs text-muted-foreground mb-1">Size</p>
+   755→                                    <p className="text-sm">{formatFileSize(doc.fileSize)}</p>
+   756→                                  </div>
+   757→                                  <div className="sm:col-span-2">
+   758→                                    <p className="text-xs text-muted-foreground mb-1">Notes</p>
+   759→                                    <p className="text-sm">{doc.note ?? 'No notes'}</p>
+   760→                                  </div>
+   761→                                </div>
+   762→                              </TableCell>
+   763→                            </TableRow>
+   764→                          )}
+   765→                        </>
+   766→                      ))}
+   767→                    </TableBody>
+   768→                  </Table>
+   769→                </div>
+   770→
+   771→                {/* Pagination */}
+   772→                <div className="flex items-center justify-between border-t px-4 py-3">
+   773→                  <p className="text-sm text-muted-foreground">
+   774→                    Showing{' '}
+   775→                    <span className="font-medium text-foreground">
+   776→                      {pagination.total > 0 ? startItem : 0}
+   777→                    </span>{' '}
+   778→                    to{' '}
+   779→                    <span className="font-medium text-foreground">{endItem}</span> of{' '}
+   780→                    <span className="font-medium text-foreground">{pagination.total}</span>{' '}
+   781→                    documents
+   782→                  </p>
+   783→                  <div className="flex items-center gap-1">
+   784→                    <Button
+   785→                      variant="outline"
+   786→                      size="icon"
+   787→                      className="h-8 w-8"
+   788→                      disabled={page <= 1}
+   789→                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+   790→                    >
+   791→                      <ChevronLeft className="size-4" />
+   792→                    </Button>
+   793→                    <span className="px-2 text-sm text-muted-foreground">
+   794→                      {page} / {pagination.pages || 1}
+   795→                    </span>
+   796→                    <Button
+   797→                      variant="outline"
+   798→                      size="icon"
+   799→                      className="h-8 w-8"
+   800→                      disabled={page >= pagination.pages}
+   801→                      onClick={() => setPage((p) => p + 1)}
+   802→                    >
+   803→                      <ChevronRight className="size-4" />
+   804→                    </Button>
+   805→                  </div>
+   806→                </div>
+   807→              </>
+   808→            )}
+   809→          </CardContent>
+   810→        </Card>
+   811→
+   812→        {/* ── Sidebar ──────────────────────────────────── */}
+   813→        <div className="space-y-4 hidden lg:block">
+   814→          {/* Storage Overview */}
+   815→          <Card>
+   816→            <CardHeader className="pb-3">
+   817→              <CardTitle className="text-sm flex items-center gap-2">
+   818→                <HardDrive className="size-4 text-emerald-600 dark:text-emerald-400" />
+   819→                Storage Overview
+   820→              </CardTitle>
+   821→            </CardHeader>
+   822→            <CardContent className="space-y-3">
+   823→              <div className="flex items-center justify-between text-sm">
+   824→                <span className="text-muted-foreground">Used</span>
+   825→                <span className="font-medium">
+   826→                  {storageUsedGB} / {TOTAL_STORAGE_GB} GB
+   827→                </span>
+   828→              </div>
+   829→              <Progress
+   830→                value={storagePercent}
+   831→                className="h-2.5 [&_[data-slot=progress-indicator]]:bg-emerald-500"
+   832→              />
+   833→              <p className="text-xs text-muted-foreground">
+   834→                {(TOTAL_STORAGE_GB - parseFloat(storageUsedGB)).toFixed(2)} GB available
+   835→              </p>
+   836→            </CardContent>
+   837→          </Card>
+   838→
+   839→          {/* Recent Uploads */}
+   840→          <Card>
+   841→            <CardHeader className="pb-3">
+   842→              <CardTitle className="text-sm flex items-center gap-2">
+   843→                <Clock className="size-4 text-emerald-600 dark:text-emerald-400" />
+   844→                Recent Uploads
+   845→              </CardTitle>
+   846→            </CardHeader>
+   847→            <CardContent>
+   848→              {stats?.recentUploads && stats.recentUploads.length > 0 ? (
+   849→                <div className="space-y-3">
+   850→                  {stats.recentUploads.slice(0, 4).map((file, idx) => (
+   851→                    <div key={idx} className="flex items-center gap-2.5">
+   852→                      <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+   853→                        <File className="size-3.5 text-muted-foreground" />
+   854→                      </div>
+   855→                      <div className="min-w-0 flex-1">
+   856→                        <p className="text-xs font-medium truncate">{file.name}</p>
+   857→                        <p className="text-[11px] text-muted-foreground">
+   858→                          {formatFileSize(file.fileSize)} · {formatDate(file.createdAt)}
+   859→                        </p>
+   860→                      </div>
+   861→                    </div>
+   862→                  ))}
+   863→                </div>
+   864→              ) : (
+   865→                <p className="text-xs text-muted-foreground text-center py-2">
+   866→                  No recent uploads
+   867→                </p>
+   868→              )}
+   869→            </CardContent>
+   870→          </Card>
+   871→
+   872→          {/* Linked Exams */}
+   873→          <Card>
+   874→            <CardHeader className="pb-3">
+   875→              <CardTitle className="text-sm flex items-center gap-2">
+   876→                <FolderOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
+   877→                Linked Exams
+   878→              </CardTitle>
+   879→            </CardHeader>
+   880→            <CardContent>
+   881→              {stats?.linkedExams && stats.linkedExams.length > 0 ? (
+   882→                <div className="space-y-2.5 max-h-48 overflow-y-auto">
+   883→                  {stats.linkedExams.map((item, idx) => (
+   884→                    <div
+   885→                      key={idx}
+   886→                      className="flex items-center justify-between rounded-lg border p-2"
+   887→                    >
+   888→                      <div className="min-w-0">
+   889→                        <p className="text-xs font-medium truncate">{item.examName}</p>
+   890→                        <p className="text-[11px] text-muted-foreground">
+   891→                          {item.count} {item.count === 1 ? 'document' : 'documents'}
+   892→                        </p>
+   893→                      </div>
+   894→                      <Badge variant="secondary" className="text-[11px] shrink-0">
+   895→                        {item.count}
+   896→                      </Badge>
+   897→                    </div>
+   898→                  ))}
+   899→                </div>
+   900→              ) : (
+   901→                <p className="text-xs text-muted-foreground text-center py-2">
+   902→                  No linked exams
+   903→                </p>
+   904→              )}
+   905→            </CardContent>
+   906→          </Card>
+   907→        </div>
+   908→      </div>
+   909→
+   910→      {/* ── Quick Upload Section ────────────────────────── */}
+   911→      <Card>
+   912→        <CardHeader className="pb-3">
+   913→          <CardTitle className="text-base flex items-center gap-2">
+   914→            <Upload className="size-4 text-emerald-600 dark:text-emerald-400" />
+   915→            Quick Upload
+   916→          </CardTitle>
+   917→        </CardHeader>
+   918→        <CardContent>
+   919→          <UploadForm
+   920→            onUpload={handleUpload}
+   921→            isPending={uploadMutation.isPending}
+   922→          />
+   923→        </CardContent>
+   924→      </Card>
+   925→
+   926→      {/* ── Delete Confirmation Dialog ──────────────────── */}
+   927→      <AlertDialog
+   928→        open={!!deleteTarget}
+   929→        onOpenChange={(open) => {
+   930→          if (!open) setDeleteTarget(null);
+   931→        }}
+   932→      >
+   933→        <AlertDialogContent>
+   934→          <AlertDialogHeader>
+   935→            <AlertDialogTitle>Delete Document</AlertDialogTitle>
+   936→            <AlertDialogDescription>
+   937→              Are you sure you want to delete &quot;{deleteTarget?.name}&quot;? This action
+   938→              cannot be undone.
+   939→            </AlertDialogDescription>
+   940→          </AlertDialogHeader>
+   941→          <AlertDialogFooter>
+   942→            <AlertDialogCancel>Cancel</AlertDialogCancel>
+   943→            <AlertDialogAction
+   944→              onClick={() => {
+   945→                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
+   946→              }}
+   947→              className="bg-red-600 hover:bg-red-700 text-white"
+   948→            >
+   949→              {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+   950→            </AlertDialogAction>
+   951→          </AlertDialogFooter>
+   952→        </AlertDialogContent>
+   953→      </AlertDialog>
+   954→    </div>
+   955→  );
+   956→}

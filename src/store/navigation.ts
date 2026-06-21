@@ -24,6 +24,9 @@ export interface NavigationState {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
+  commandSearchOpen: boolean;
+  setCommandSearchOpen: (open: boolean) => void;
+  toggleCommandSearch: () => void;
 }
 
 export const useNavigationStore = create<NavigationState>((set) => ({
@@ -49,4 +52,7 @@ export const useNavigationStore = create<NavigationState>((set) => ({
   sidebarOpen: false,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  commandSearchOpen: false,
+  setCommandSearchOpen: (open) => set({ commandSearchOpen: open }),
+  toggleCommandSearch: () => set((state) => ({ commandSearchOpen: !state.commandSearchOpen })),
 }));

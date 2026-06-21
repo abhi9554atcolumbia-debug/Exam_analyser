@@ -4,6 +4,7 @@ import { useEffect, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Sidebar, MobileSidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { CommandSearch } from '@/components/CommandSearch';
 import { useNavigationStore } from '@/store/navigation';
 import { useUserStore } from '@/store/user-store';
 import { useQuery } from '@tanstack/react-query';
@@ -92,6 +93,9 @@ export function AppLayout({ children }: AppLayoutProps) {
           </AnimatePresence>
         </main>
       </div>
+
+      {/* Global Command Search Dialog */}
+      <CommandSearch />
     </div>
   );
 }

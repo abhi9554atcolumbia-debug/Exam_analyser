@@ -14,7 +14,7 @@ import {
   createGoal, updateGoal, completeGoal, deleteGoal, getUpcomingExams,
   type Goal,
 } from '@/lib/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -33,12 +34,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 
-const priorityConfig: Record<string, { color: string; badge: string; dot: string }> = {
-  high: { color: 'border-l-red-500', badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', dot: 'bg-red-500' },
-  medium: { color: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', dot: 'bg-amber-500' },
-  low: { color: 'border-l-emerald-500', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
+const priorityConfig: Record<string, { color: string; badge: string; dot: string; border: string }> = {
+  high: { color: 'border-l-red-500', badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', dot: 'bg-red-500', border: 'border-red-200 dark:border-red-800' },
+  medium: { color: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', dot: 'bg-amber-500', border: 'border-amber-200 dark:border-amber-800' },
+  low: { color: 'border-l-emerald-500', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500', border: 'border-emerald-200 dark:border-emerald-800' },
 };
 
 const DEFAULT_TEMPLATES = [
@@ -74,9 +74,45 @@ function CelebrationOverlay({ show }: { show: boolean }) {
           </div>
         </div>
         <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 animate-in slide-in-from-bottom-4 duration-500">
-          Goal Completed! 🎉
+          Goal Completed!
         </p>
       </div>
+    </div>
+  );
+}
+
+/* ── Completion Rate Ring ──────────────────────────────────── */
+function CompletionRateRing({ rate, total }: { rate: number; total: number }) {
+  const radius = 40;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (rate / 100) * circumference;
+
+  return (
+    <div className="flex flex-col items-center justify-center">
+      <div className="relative">
+        <svg width="110" height="110" className="-rotate-90">
+          <circle
+            cx="55" cy="55" r={radius}
+            fill="none"
+            strokeWidth="8"
+            className="stroke-muted"
+          />
+          <circle
+            cx="55" cy="55" r={radius}
+            fill="none"
+            strokeWidth="8"
+            strokeLinecap="round"
+            className="stroke-emerald-500 transition-all duration-700"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-2xl font-extrabold text-foreground">{rate}%</span>
+          <span className="text-[10px] text-muted-foreground">completed</span>
+        </div>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">{total} total goals</p>
     </div>
   );
 }
@@ -119,7 +155,7 @@ export default function GoalsPage() {
     onSuccess: (_data, goalId) => {
       queryClient.invalidateQueries({ queryKey: ['goals'] });
       queryClient.invalidateQueries({ queryKey: ['goalStats'] });
-      toast.success('Goal completed! 🎉');
+      toast.success('Goal completed!');
       setCelebratingId(goalId);
       setTimeout(() => setCelebratingId(null), 2500);
     },
@@ -172,7 +208,8 @@ export default function GoalsPage() {
     setCreateOpen(true);
   };
 
-  const completionRate = stats ? (stats.active + stats.completed > 0 ? Math.round((stats.completed / (stats.active + stats.completed)) * 100) : 0) : 0;
+  const totalGoals = (stats?.active ?? 0) + (stats?.completed ?? 0);
+  const completionRate = totalGoals > 0 ? Math.round(((stats?.completed ?? 0) / totalGoals) * 100) : 0;
   const weekDots = streak?.weekDots || '0000000';
   const allTemplates = templates && templates.length > 0 ? templates : DEFAULT_TEMPLATES;
 
@@ -195,9 +232,135 @@ export default function GoalsPage() {
       {/* Celebration Overlay */}
       <CelebrationOverlay show={!!celebratingId} />
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <Card className="gap-0 py-0">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">Goals</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Set, track, and achieve your study goals</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Sparkles className="size-4" /> Templates
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[85vh]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                  Goal Templates
+                </DialogTitle>
+                <DialogDescription>Choose a template to get started quickly</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3 max-h-[55vh] overflow-y-auto mt-2 pr-1">
+                {allTemplates.map((t, i) => {
+                  const pc = priorityConfig[t.priority] || priorityConfig.medium;
+                  return (
+                    <Card
+                      key={i}
+                      className="cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 hover:border-emerald-500"
+                      onClick={() => applyTemplate(t)}
+                    >
+                      <CardContent className="p-4 flex items-start gap-3">
+                        <div className={cn(
+                          'flex size-10 shrink-0 items-center justify-center rounded-xl mt-0.5',
+                          pc.badge,
+                        )}>
+                          <Zap className="size-4" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-sm">{t.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</p>
+                          <div className="flex gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">{t.subject}</Badge>
+                            <Badge className={cn('text-xs', pc.badge)}>{t.priority}</Badge>
+                          </div>
+                        </div>
+                        <ChevronRight className="size-4 text-muted-foreground shrink-0 mt-1" />
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </DialogContent>
+          </Dialog>
+          <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
+            <DialogTrigger asChild>
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800">
+                <Plus className="size-4" /> New Goal
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Create New Goal</DialogTitle>
+                <DialogDescription>Set a new study goal to track your progress</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-2">
+                <div>
+                  <Label htmlFor="goal-title">Title <span className="text-red-500">*</span></Label>
+                  <Input id="goal-title" className="mt-1.5" placeholder="e.g. Complete Quant chapter 5" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} />
+                  {!form.title.trim() && <p className="text-xs text-red-500 mt-1">Title is required</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="goal-priority">Priority</Label>
+                    <Select value={form.priority} onValueChange={(v) => setForm(f => ({ ...f, priority: v }))}>
+                      <SelectTrigger id="goal-priority" className="mt-1.5"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="high">High</SelectItem>
+                        <SelectItem value="medium">Medium</SelectItem>
+                        <SelectItem value="low">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="goal-exam">Linked Exam</Label>
+                    <Select value={form.linkedExam} onValueChange={(v) => setForm(f => ({ ...f, linkedExam: v }))}>
+                      <SelectTrigger id="goal-exam" className="mt-1.5">
+                        <SelectValue placeholder="Select exam" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {upcomingExams?.map((exam) => (
+                          <SelectItem key={exam.id} value={exam.name}>{exam.name}</SelectItem>
+                        ))}
+                        {(!upcomingExams || upcomingExams.length === 0) && (
+                          <SelectItem value="custom" disabled>No exams available</SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="goal-subject">Subject</Label>
+                    <Input id="goal-subject" className="mt-1.5" placeholder="e.g. Mathematics" value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label htmlFor="goal-due">Due Date <span className="text-red-500">*</span></Label>
+                    <Input id="goal-due" type="date" className="mt-1.5" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+                    {!form.dueDate && <p className="text-xs text-red-500 mt-1">Due date is required</p>}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="goal-desc">Description</Label>
+                  <Textarea id="goal-desc" className="mt-1.5" rows={3} placeholder="Describe your goal..." value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
+                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleCreate} disabled={createMutation.isPending || !form.title.trim() || !form.dueDate}>
+                  {createMutation.isPending ? 'Creating...' : 'Create Goal'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Stat Cards + Completion Ring */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="gap-0 py-0 transition-shadow duration-200 hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Active Goals</CardTitle>
             <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
@@ -209,7 +372,7 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-0">
+        <Card className="gap-0 py-0 transition-shadow duration-200 hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
             <div className="flex size-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
@@ -221,7 +384,7 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-0">
+        <Card className="gap-0 py-0 transition-shadow duration-200 hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
             <div className="flex size-8 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">
@@ -233,22 +396,10 @@ export default function GoalsPage() {
           </CardContent>
         </Card>
 
-        <Card className="gap-0 py-0">
+        <Card className="gap-0 py-0 transition-shadow duration-200 hover:shadow-md">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completion Rate</CardTitle>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
-              <TrendingUp className="size-4" />
-            </div>
-          </CardHeader>
-          <CardContent className="pb-4">
-            <div className="text-2xl font-bold">{completionRate}%</div>
-          </CardContent>
-        </Card>
-
-        <Card className="gap-0 py-0 col-span-2 sm:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Next Goal Due</CardTitle>
-            <div className="flex size-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Next Due</CardTitle>
+            <div className="flex size-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
               <Clock className="size-4" />
             </div>
           </CardHeader>
@@ -258,123 +409,6 @@ export default function GoalsPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-3">
-        <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
-          <DialogTrigger asChild>
-            <Button variant="outline" className="gap-2">
-              <Sparkles className="size-4" /> Goal Templates
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[85vh]">
-            <DialogHeader>
-              <DialogTitle>Goal Templates</DialogTitle>
-              <DialogDescription>Choose a template to get started quickly</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 max-h-[55vh] overflow-y-auto mt-2 pr-1">
-              {allTemplates.map((t, i) => (
-                <Card key={i} className="cursor-pointer hover:border-emerald-500 transition-all hover:shadow-sm" onClick={() => applyTemplate(t)}>
-                  <CardContent className="p-4 flex items-start gap-3">
-                    <div className={cn(
-                      'flex size-9 shrink-0 items-center justify-center rounded-lg mt-0.5',
-                      t.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400' :
-                      t.priority === 'medium' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400' :
-                      'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
-                    )}>
-                      <Zap className="size-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm">{t.title}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</p>
-                      <div className="flex gap-2 mt-1.5">
-                        <Badge variant="secondary" className="text-xs">{t.subject}</Badge>
-                        <Badge className={cn('text-xs', priorityConfig[t.priority]?.badge)}>{t.priority}</Badge>
-                      </div>
-                    </div>
-                    <ChevronRight className="size-4 text-muted-foreground shrink-0 mt-1" />
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
-              <Plus className="size-4" /> New Goal
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Create New Goal</DialogTitle>
-              <DialogDescription>Set a new study goal to track your progress</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 mt-2">
-              <div>
-                <Label htmlFor="goal-title">Title *</Label>
-                <Input id="goal-title" className="mt-1.5" placeholder="e.g. Complete Quant chapter 5" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} />
-                {!form.title.trim() && (
-                  <p className="text-xs text-red-500 mt-1">Title is required</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="goal-priority">Priority</Label>
-                  <Select value={form.priority} onValueChange={(v) => setForm(f => ({ ...f, priority: v }))}>
-                    <SelectTrigger id="goal-priority" className="mt-1.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">High</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="low">Low</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="goal-exam">Linked Exam</Label>
-                  <Select value={form.linkedExam} onValueChange={(v) => setForm(f => ({ ...f, linkedExam: v }))}>
-                    <SelectTrigger id="goal-exam" className="mt-1.5">
-                      <SelectValue placeholder="Select exam" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {upcomingExams?.map((exam) => (
-                        <SelectItem key={exam.id} value={exam.name}>{exam.name}</SelectItem>
-                      ))}
-                      {(!upcomingExams || upcomingExams.length === 0) && (
-                        <SelectItem value="custom" disabled>No exams available</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="goal-subject">Subject</Label>
-                  <Input id="goal-subject" className="mt-1.5" placeholder="e.g. Mathematics" value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} />
-                </div>
-                <div>
-                  <Label htmlFor="goal-due">Due Date *</Label>
-                  <Input id="goal-due" type="date" className="mt-1.5" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} />
-                  {!form.dueDate && (
-                    <p className="text-xs text-red-500 mt-1">Due date is required</p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="goal-desc">Description</Label>
-                <Textarea id="goal-desc" className="mt-1.5" rows={3} placeholder="Describe your goal..." value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
-              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleCreate} disabled={createMutation.isPending || !form.title.trim() || !form.dueDate}>
-                {createMutation.isPending ? 'Creating...' : 'Create Goal'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
       {/* Main Content Grid */}
@@ -416,20 +450,10 @@ export default function GoalsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
-                    onClick={() => completeMutation.mutate(stats.nextDue!.id)}
-                    disabled={completeMutation.isPending}
-                  >
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20" onClick={() => completeMutation.mutate(stats.nextDue!.id)} disabled={completeMutation.isPending}>
                     <CheckCircle2 className="size-4 mr-1.5" /> Mark Complete
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
-                    onClick={() => openProgress(stats.nextDue!)}
-                  >
+                  <Button size="sm" variant="outline" className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/40" onClick={() => openProgress(stats.nextDue!)}>
                     Update Progress
                   </Button>
                 </div>
@@ -442,13 +466,8 @@ export default function GoalsPage() {
                   <Rocket className="size-7 text-emerald-600 dark:text-emerald-400" />
                 </div>
                 <p className="font-semibold text-emerald-800 dark:text-emerald-200">No active goals yet</p>
-                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-                  Start your journey by creating a goal. Every step counts towards your dream career!
-                </p>
-                <Button
-                  className="mt-4 bg-emerald-600 hover:bg-emerald-700"
-                  onClick={() => setCreateOpen(true)}
-                >
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm">Start your journey by creating a goal. Every step counts towards your dream career!</p>
+                <Button className="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setCreateOpen(true)}>
                   <Plus className="size-4 mr-1.5" /> Create Your First Goal
                 </Button>
               </CardContent>
@@ -467,13 +486,7 @@ export default function GoalsPage() {
                 const isOverdue = goal.dueDate && isBefore(parseISO(goal.dueDate), new Date());
                 const countdown = getDueCountdown(goal.dueDate);
                 return (
-                  <Card
-                    key={goal.id}
-                    className={cn(
-                      'border-l-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
-                      pc.color,
-                    )}
-                  >
+                  <Card key={goal.id} className={cn('border-l-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md rounded-xl', pc.color)}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex-1 min-w-0">
@@ -490,15 +503,9 @@ export default function GoalsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openProgress(goal)}>
-                              <TrendingUp className="size-4 mr-2" />Update Progress
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openEdit(goal)}>
-                              <Pencil className="size-4 mr-2" />Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => deleteMutation.mutate(goal.id)} className="text-red-600">
-                              <Trash2 className="size-4 mr-2" />Delete
-                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openProgress(goal)}><TrendingUp className="size-4 mr-2" />Update Progress</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openEdit(goal)}><Pencil className="size-4 mr-2" />Edit</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => deleteMutation.mutate(goal.id)} className="text-red-600"><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -512,13 +519,8 @@ export default function GoalsPage() {
                           </p>
                         )}
                         {countdown && (
-                          <p className={cn(
-                            countdown.urgent
-                              ? 'text-amber-600 dark:text-amber-400 font-medium'
-                              : 'text-muted-foreground'
-                          )}>
-                            <Clock className="size-3 inline mr-1" />
-                            {countdown.text}
+                          <p className={cn(countdown.urgent ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>
+                            <Clock className="size-3 inline mr-1" />{countdown.text}
                           </p>
                         )}
                       </div>
@@ -529,12 +531,7 @@ export default function GoalsPage() {
                         <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => openProgress(goal)}>
                           <TrendingUp className="size-3 mr-1" /> Update Progress
                         </Button>
-                        <Button
-                          size="sm"
-                          className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => completeMutation.mutate(goal.id)}
-                          disabled={completeMutation.isPending}
-                        >
+                        <Button size="sm" className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => completeMutation.mutate(goal.id)} disabled={completeMutation.isPending}>
                           <CheckCircle2 className="size-3 mr-1" /> Complete
                         </Button>
                       </div>
@@ -559,7 +556,7 @@ export default function GoalsPage() {
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
               {completedGoals?.map((goal) => (
-                <Card key={goal.id} className="opacity-80 hover:opacity-100 transition-opacity">
+                <Card key={goal.id} className="opacity-80 hover:opacity-100 transition-all duration-200 hover:shadow-sm">
                   <CardContent className="p-3 flex items-start gap-2">
                     <CheckCircle2 className="size-5 text-teal-600 shrink-0 mt-0.5" />
                     <div className="min-w-0">
@@ -582,8 +579,23 @@ export default function GoalsPage() {
 
         {/* Right Sidebar */}
         <div className="space-y-6">
-          {/* Study Streak - Prominent */}
-          <Card className="border-emerald-200 dark:border-emerald-800">
+          {/* Completion Rate Ring */}
+          <Card className="transition-shadow duration-200 hover:shadow-md">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                  <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold">Completion Rate</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="flex justify-center py-4">
+              <CompletionRateRing rate={completionRate} total={totalGoals} />
+            </CardContent>
+          </Card>
+
+          {/* Study Streak */}
+          <Card className="border-emerald-200 dark:border-emerald-800 transition-shadow duration-200 hover:shadow-md">
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-4">
                 <div className="flex size-9 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/40">
@@ -597,52 +609,63 @@ export default function GoalsPage() {
                 </p>
                 <p className="text-sm font-medium text-muted-foreground mt-1">day streak</p>
               </div>
-              <div className="flex gap-2.5 justify-center mb-3">
+              <div className="flex gap-3 justify-center mb-3">
                 {weekDots.split('').map((d, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      'size-5 rounded-full transition-all',
-                      d === '1'
-                        ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30'
-                        : 'bg-gray-200 dark:bg-gray-700'
-                    )}
-                    title={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
-                  />
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <div
+                      className={cn(
+                        'size-7 rounded-full transition-all duration-200 flex items-center justify-center',
+                        d === '1'
+                          ? 'bg-emerald-500 shadow-md shadow-emerald-500/30 scale-110'
+                          : 'bg-muted',
+                      )}
+                      title={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][i]}
+                    >
+                      {d === '1' && <Flame className="h-3.5 w-3.5 text-white" />}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
+                    </span>
+                  </div>
                 ))}
               </div>
-              <div className="flex justify-between px-1 mb-4">
-                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                  <span key={i} className="text-[10px] text-muted-foreground w-5 text-center">{d}</span>
-                ))}
-              </div>
-              <Separator className="mb-3" />
+              <Separator className="my-3" />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">Longest streak</span>
                 <span className="text-sm font-bold text-amber-600 dark:text-amber-400">
                   {streak?.longestStreak ?? 0} days
                 </span>
               </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-muted-foreground">Days this month</span>
+                <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                  {streak?.daysThisMonth ?? 0}
+                </span>
+              </div>
             </CardContent>
           </Card>
 
           {/* Upcoming Deadlines */}
-          <Card>
+          <Card className="transition-shadow duration-200 hover:shadow-md">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Clock className="size-4 text-amber-500" /> Upcoming Deadlines
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                  <Clock className="size-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold">Upcoming Deadlines</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {activeGoals?.filter(g => g.dueDate).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!)).slice(0, 3).map((g) => {
                 const cd = getDueCountdown(g.dueDate);
+                const pc = priorityConfig[g.priority] || priorityConfig.medium;
                 return (
-                  <div key={g.id} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className={cn('size-2 rounded-full shrink-0', priorityConfig[g.priority]?.dot)} />
-                      <span className="text-sm truncate">{g.title}</span>
+                  <div key={g.id} className="flex items-center justify-between rounded-lg border p-2.5 transition-colors hover:bg-muted/50">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={cn('size-2.5 rounded-full shrink-0', pc.dot)} />
+                      <span className="text-sm truncate font-medium">{g.title}</span>
                     </div>
-                    <span className={cn('text-xs whitespace-nowrap', cd?.urgent ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>
+                    <span className={cn('text-xs whitespace-nowrap font-medium', cd?.urgent ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
                       {cd?.text ?? '—'}
                     </span>
                   </div>
@@ -652,40 +675,22 @@ export default function GoalsPage() {
           </Card>
 
           {/* Priority Goals */}
-          <Card>
+          <Card className="transition-shadow duration-200 hover:shadow-md">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <AlertTriangle className="size-4 text-red-500" /> Priority Goals
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/50">
+                  <AlertTriangle className="size-4 text-red-600 dark:text-red-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold">High Priority</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2.5">
               {activeGoals?.filter(g => g.priority === 'high').slice(0, 3).map((g) => (
-                <div key={g.id} className="flex items-center gap-2">
-                  <div className="size-2 rounded-full bg-red-500 shrink-0" />
-                  <span className="text-sm truncate">{g.title}</span>
+                <div key={g.id} className="flex items-center gap-2.5 rounded-lg border border-red-200 dark:border-red-800 p-2.5 transition-colors hover:bg-red-50/50 dark:hover:bg-red-950/20">
+                  <div className="size-2.5 rounded-full bg-red-500 shrink-0" />
+                  <span className="text-sm truncate font-medium">{g.title}</span>
                 </div>
               )) || <p className="text-sm text-muted-foreground">No high priority goals</p>}
-            </CardContent>
-          </Card>
-
-          {/* Smart Suggestions */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Lightbulb className="size-4 text-amber-500" /> Smart Suggestions
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {[
-                'Break large goals into smaller weekly targets',
-                'Review your study schedule and adjust timelines',
-                'Focus on overdue goals first for quick wins',
-              ].map((s, i) => (
-                <div key={i} className="flex items-start gap-2">
-                  <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
-                  <p className="text-xs text-muted-foreground">{s}</p>
-                </div>
-              ))}
             </CardContent>
           </Card>
         </div>
@@ -746,7 +751,7 @@ export default function GoalsPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleEdit} disabled={updateMutation.isPending}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleEdit} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>
@@ -764,9 +769,7 @@ export default function GoalsPage() {
             <div className="text-center mb-6">
               <div className="relative inline-block">
                 <span className="text-5xl font-extrabold text-emerald-600 dark:text-emerald-400">{progressValue}%</span>
-                {progressValue === 100 && (
-                  <Trophy className="size-6 text-amber-500 absolute -top-2 -right-6" />
-                )}
+                {progressValue === 100 && <Trophy className="size-6 text-amber-500 absolute -top-2 -right-6" />}
               </div>
               <p className="text-sm text-muted-foreground mt-2">
                 {progressValue === 0 && 'Just getting started!'}
@@ -774,7 +777,7 @@ export default function GoalsPage() {
                 {progressValue >= 25 && progressValue < 50 && 'Making solid progress!'}
                 {progressValue >= 50 && progressValue < 75 && 'You\'re halfway there!'}
                 {progressValue >= 75 && progressValue < 100 && 'Almost there, finish strong!'}
-                {progressValue === 100 && 'Ready to mark complete! 🎉'}
+                {progressValue === 100 && 'Ready to mark complete!'}
               </p>
             </div>
             <Slider
@@ -783,7 +786,7 @@ export default function GoalsPage() {
               max={100}
               step={5}
               onValueChange={(v) => setProgressValue(v[0])}
-              className="mb-2"
+              className="mb-2 [&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:border-emerald-500"
             />
             <div className="flex justify-between">
               <span className="text-xs text-muted-foreground">0%</span>
@@ -793,7 +796,7 @@ export default function GoalsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setProgressOpen(false)}>Cancel</Button>
             <Button
-              className="bg-emerald-600 hover:bg-emerald-700"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => selectedGoal && progressMutation.mutate({ id: selectedGoal.id, progress: progressValue })}
               disabled={progressMutation.isPending}
             >

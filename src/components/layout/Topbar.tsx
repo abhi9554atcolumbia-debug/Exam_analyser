@@ -171,7 +171,7 @@ const NOTIFICATION_ICON_COLOR: Record<string, string> = {
 };
 
 export function Topbar() {
-  const { currentPage, navigate, setSidebarOpen } = useNavigationStore();
+  const { currentPage, navigate, setSidebarOpen, setCommandSearchOpen } = useNavigationStore();
   const { profile, setNotificationsCount, clearNotifications } = useUserStore();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -330,6 +330,24 @@ export function Topbar() {
           />
         </div>
       )}
+
+      {/* Command Search trigger (always visible) */}
+      <button
+        onClick={() => setCommandSearchOpen(true)}
+        className={cn(
+          'group flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-sm text-muted-foreground transition-all duration-150',
+          'hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700',
+          'dark:hover:border-emerald-700 dark:hover:bg-emerald-950/40 dark:hover:text-emerald-300',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
+        )}
+        aria-label="Open search (⌘K)"
+      >
+        <Search className="size-3.5 text-muted-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400" />
+        <span className="hidden text-xs sm:inline">Search...</span>
+        <kbd className="pointer-events-none hidden rounded border bg-background px-1 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-block">
+          ⌘K
+        </kbd>
+      </button>
 
       {/* Add Exam button (conditional) */}
       {meta.showAdd && (

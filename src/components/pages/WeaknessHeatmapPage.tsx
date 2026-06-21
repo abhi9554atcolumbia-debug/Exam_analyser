@@ -10,11 +10,15 @@ import {
   Target,
   TrendingDown,
   XCircle,
+  Shield,
+  Crosshair,
+  Eye,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 import {
   Table,
   TableBody,
@@ -35,19 +39,29 @@ import {
   type WeaknessRow,
 } from '@/lib/api';
 
-/* ─── Heatmap Cell Color Logic ─────────────────────────────── */
+/* ─── Heatmap Cell Color Logic (gradient) ──────────────────── */
 function getHeatmapCellClasses(value: number): string {
-  if (value <= 30) return 'bg-red-100 text-red-600 dark:bg-red-950/60 dark:text-red-400';
-  if (value <= 50) return 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400';
-  if (value <= 70) return 'bg-yellow-100 text-yellow-600 dark:bg-yellow-950/60 dark:text-yellow-400';
-  return 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400';
+  if (value <= 20) return 'bg-red-500/20 text-red-700 dark:bg-red-500/30 dark:text-red-300';
+  if (value <= 30) return 'bg-red-400/15 text-red-600 dark:bg-red-400/25 dark:text-red-400';
+  if (value <= 40) return 'bg-orange-400/15 text-orange-700 dark:bg-orange-400/25 dark:text-orange-300';
+  if (value <= 50) return 'bg-amber-400/15 text-amber-700 dark:bg-amber-400/25 dark:text-amber-300';
+  if (value <= 60) return 'bg-yellow-400/15 text-yellow-700 dark:bg-yellow-400/25 dark:text-yellow-300';
+  if (value <= 70) return 'bg-lime-400/15 text-lime-700 dark:bg-lime-400/25 dark:text-lime-300';
+  if (value <= 80) return 'bg-emerald-400/15 text-emerald-700 dark:bg-emerald-400/25 dark:text-emerald-300';
+  return 'bg-emerald-500/20 text-emerald-600 dark:bg-emerald-500/30 dark:text-emerald-400';
 }
 
-function getHeatmapBadgeClasses(value: number): string {
+function getHeatmapDotColor(value: number): string {
   if (value <= 30) return 'bg-red-500';
   if (value <= 50) return 'bg-amber-500';
   if (value <= 70) return 'bg-yellow-500';
   return 'bg-emerald-500';
+}
+
+function getSeverityBadge(value: number) {
+  if (value <= 30) return { label: 'Critical', cls: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800' };
+  if (value <= 50) return { label: 'Moderate', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-800' };
+  return { label: 'Minor', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' };
 }
 
 /* ─── Skeletons ────────────────────────────────────────────── */
@@ -135,6 +149,15 @@ const HEATMAP_COLUMNS: { key: keyof WeaknessRow; label: string }[] = [
   { key: 'overall', label: 'Overall' },
 ];
 
+/* ─── Color Legend ─────────────────────────────────────────── */
+const COLOR_SCALE = [
+  { range: '0–20', label: 'Critical', color: 'bg-red-500' },
+  { range: '21–40', label: 'Weak', color: 'bg-orange-500' },
+  { range: '41–60', label: 'Moderate', color: 'bg-amber-500' },
+  { range: '61–80', label: 'Good', color: 'bg-yellow-500' },
+  { range: '81–100', label: 'Strong', color: 'bg-emerald-500' },
+];
+
 /* ─── Main Component ───────────────────────────────────────── */
 export default function WeaknessHeatmapPage() {
   /* ── Queries ── */
@@ -166,6 +189,30 @@ export default function WeaknessHeatmapPage() {
 
   /* ── Exam data ── */
   const examData = examQuery.data ?? [];
+
+  /* ── Focus Areas: Top 3 weakest subjects from heatmap ── */
+  const focusAreas = [...heatmap]
+    .sort((a, b) => a.overall - b.overall)
+    .slice(0, 3)
+    .map((row) => {
+      // Find the weakest column for this subject
+      let weakestCol = HEATMAP_COLUMNS[0];
+      let weakestVal = 100;
+      for (const col of HEATMAP_COLUMNS) {
+        if (col.key === 'overall') continue;
+        const val = row[col.key] as number;
+        if (val < weakestVal) {
+          weakestVal = val;
+          weakestCol = col;
+        }
+      }
+      return {
+        subject: row.subject,
+        overall: row.overall,
+        weakestArea: weakestCol.label,
+        weakestScore: weakestVal,
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -227,16 +274,21 @@ export default function WeaknessHeatmapPage() {
           {heatmapQuery.isLoading ? (
             <TableSkeleton />
           ) : (
-            <Card className="overflow-hidden">
+            <Card className="overflow-hidden transition-shadow duration-200 hover:shadow-md">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                  <Brain className="h-4 w-4 text-emerald-600" />
-                  Subject × Weakness Type Heatmap
-                </CardTitle>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Color intensity shows the severity of each weakness type per subject. Higher scores
-                  indicate weaker areas.
-                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                    <Brain className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">
+                      Subject × Weakness Type Heatmap
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Color intensity shows the severity of each weakness type per subject. Lower scores indicate weaker areas.
+                    </CardDescription>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -249,7 +301,10 @@ export default function WeaknessHeatmapPage() {
                         {HEATMAP_COLUMNS.map((col) => (
                           <TableHead
                             key={col.key}
-                            className="min-w-[90px] text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+                            className={cn(
+                              'min-w-[90px] text-center text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+                              col.key === 'overall' && 'bg-muted/50',
+                            )}
                           >
                             {col.label}
                           </TableHead>
@@ -257,52 +312,129 @@ export default function WeaknessHeatmapPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {heatmap.map((row) => (
-                        <TableRow key={row.subject}>
-                          <TableCell className="sticky left-0 z-10 bg-background font-medium text-foreground">
-                            <div className="flex items-center gap-2">
-                              {row.subject}
-                              <Badge
-                                variant="outline"
-                                className={`ml-auto text-[10px] font-semibold ${getHeatmapCellClasses(row.overall)}`}
-                              >
-                                {row.overall}
-                              </Badge>
-                            </div>
-                          </TableCell>
-                          {HEATMAP_COLUMNS.map((col) => {
-                            const val = row[col.key] as number;
-                            return (
-                              <TableCell
-                                key={col.key}
-                                className={`text-center font-semibold ${getHeatmapCellClasses(val)}`}
-                              >
-                                {val}
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
+                      {heatmap.map((row) => {
+                        const severity = getSeverityBadge(row.overall);
+                        return (
+                          <TableRow key={row.subject} className="group transition-colors hover:bg-muted/30">
+                            <TableCell className="sticky left-0 z-10 bg-background font-medium text-foreground group-hover:bg-muted/30">
+                              <div className="flex items-center gap-2">
+                                <span className="truncate">{row.subject}</span>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'ml-auto shrink-0 border text-[10px] font-bold',
+                                    severity.cls,
+                                  )}
+                                >
+                                  {severity.label}
+                                </Badge>
+                              </div>
+                            </TableCell>
+                            {HEATMAP_COLUMNS.map((col) => {
+                              const val = row[col.key] as number;
+                              return (
+                                <TableCell
+                                  key={col.key}
+                                  className={cn(
+                                    'text-center font-semibold transition-colors',
+                                    getHeatmapCellClasses(val),
+                                    col.key === 'overall' && 'font-bold',
+                                  )}
+                                >
+                                  {val}
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
 
                 {/* Color Legend */}
-                <div className="flex flex-wrap items-center justify-center gap-4 border-t px-4 py-3">
-                  <span className="text-xs font-medium text-muted-foreground">Severity:</span>
-                  {[
-                    { range: '0–30', label: 'Critical', cls: 'bg-red-500' },
-                    { range: '31–50', label: 'Weak', cls: 'bg-amber-500' },
-                    { range: '51–70', label: 'Moderate', cls: 'bg-yellow-500' },
-                    { range: '71–100', label: 'Strong', cls: 'bg-emerald-500' },
-                  ].map((item) => (
+                <div className="flex flex-wrap items-center justify-center gap-4 border-t bg-muted/20 px-4 py-3">
+                  <span className="text-xs font-semibold text-muted-foreground">Severity Scale:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-muted-foreground mr-1">Weak</span>
+                    {COLOR_SCALE.map((item) => (
+                      <div key={item.range} className="flex items-center gap-0.5">
+                        <div className={cn('h-4 w-8 rounded-sm', item.color)} />
+                      </div>
+                    ))}
+                    <span className="text-[10px] text-muted-foreground ml-1">Strong</span>
+                  </div>
+                  <div className="h-4 w-px bg-border" />
+                  {COLOR_SCALE.map((item) => (
                     <div key={item.range} className="flex items-center gap-1.5">
-                      <span className={`inline-block h-3 w-3 rounded-sm ${item.cls}`} />
-                      <span className="text-xs text-muted-foreground">
-                        {item.range} {item.label}
+                      <span className={cn('inline-block h-3 w-3 rounded-sm', item.color)} />
+                      <span className="text-[11px] text-muted-foreground">
+                        {item.range}
                       </span>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── Focus Areas ── */}
+          {heatmap.length > 0 && (
+            <Card className="border-l-4 border-l-rose-500 transition-shadow duration-200 hover:shadow-md">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-900/50">
+                    <Crosshair className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Focus Areas</CardTitle>
+                    <CardDescription className="text-xs">
+                      Top 3 subjects that need your immediate attention
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {focusAreas.map((area, idx) => {
+                    const sev = getSeverityBadge(area.overall);
+                    return (
+                      <div
+                        key={area.subject}
+                        className={cn(
+                          'rounded-xl border p-4 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5',
+                          idx === 0 && 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20',
+                          idx === 1 && 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20',
+                          idx === 2 && 'border-yellow-200 bg-yellow-50/50 dark:border-yellow-800 dark:bg-yellow-950/20',
+                        )}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              'flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white',
+                              idx === 0 ? 'bg-red-500' : idx === 1 ? 'bg-amber-500' : 'bg-yellow-500',
+                            )}>
+                              {idx + 1}
+                            </span>
+                            <span className="text-sm font-semibold text-foreground">{area.subject}</span>
+                          </div>
+                          <Badge variant="outline" className={cn('border text-[10px] font-bold', sev.cls)}>
+                            {sev.label}
+                          </Badge>
+                        </div>
+                        <div className="mt-3 space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Overall Score</span>
+                            <span className="font-bold text-foreground">{area.overall}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Weakest In</span>
+                            <span className="font-medium text-foreground">{area.weakestArea} ({area.weakestScore})</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
@@ -314,34 +446,64 @@ export default function WeaknessHeatmapPage() {
             {topQuery.isLoading ? (
               <SectionSkeleton />
             ) : (
-              <Card>
+              <Card className="transition-shadow duration-200 hover:shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Flame className="h-4 w-4 text-amber-600" />
-                    Top 3 Weaknesses
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                      <Flame className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold">Top 3 Weaknesses</CardTitle>
+                      <CardDescription className="text-xs">
+                        Most critical areas identified from your reflections
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {topWeaknesses.length > 0 ? (
                     <div className="space-y-3">
                       {topWeaknesses.slice(0, 3).map((item) => {
-                        const rankColors = [
+                        const severityCls = [
+                          'border-l-red-500 bg-red-50/50 dark:bg-red-950/20',
+                          'border-l-amber-500 bg-amber-50/50 dark:bg-amber-950/20',
+                          'border-l-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/20',
+                        ];
+                        const badgeCls = [
                           'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
                           'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
                           'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
                         ];
+                        const severityLabels = ['Critical', 'High', 'Moderate'];
                         return (
                           <div
                             key={item.rank}
-                            className="flex items-start gap-3 rounded-lg border p-3"
+                            className={cn(
+                              'flex items-start gap-3 rounded-lg border-l-4 p-3 transition-all duration-200 hover:shadow-sm',
+                              severityCls[item.rank - 1] ?? severityCls[2],
+                            )}
                           >
                             <span
-                              className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${rankColors[item.rank - 1] ?? rankColors[2]}`}
+                              className={cn(
+                                'flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                                badgeCls[item.rank - 1] ?? badgeCls[2],
+                              )}
                             >
                               #{item.rank}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                                <Badge
+                                  variant="outline"
+                                  className={cn(
+                                    'border text-[10px] font-bold',
+                                    badgeCls[item.rank - 1] ?? badgeCls[2],
+                                  )}
+                                >
+                                  {severityLabels[item.rank - 1] ?? 'Moderate'}
+                                </Badge>
+                              </div>
                               <p className="mt-0.5 text-xs text-muted-foreground">{item.sub}</p>
                             </div>
                             {item.rank === 1 && (
@@ -364,25 +526,34 @@ export default function WeaknessHeatmapPage() {
             {recsQuery.isLoading ? (
               <SectionSkeleton />
             ) : (
-              <Card>
+              <Card className="transition-shadow duration-200 hover:shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    Recommended Actions
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold">Recommended Actions</CardTitle>
+                      <CardDescription className="text-xs">
+                        Prioritized steps to improve your weak areas
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {recommendations.length > 0 ? (
-                    <ul className="space-y-3">
+                    <ol className="space-y-3">
                       {recommendations.map((rec, idx) => (
                         <li key={idx} className="flex items-start gap-3">
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />
-                          <span className="text-sm leading-relaxed text-muted-foreground">
+                          <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                            {idx + 1}
+                          </span>
+                          <span className="pt-0.5 text-sm leading-relaxed text-muted-foreground">
                             {rec}
                           </span>
                         </li>
                       ))}
-                    </ul>
+                    </ol>
                   ) : (
                     <p className="py-6 text-center text-sm text-muted-foreground">
                       Complete more reflections to get personalized recommendations.
@@ -399,12 +570,19 @@ export default function WeaknessHeatmapPage() {
             {stageQuery.isLoading ? (
               <SectionSkeleton lines={3} />
             ) : (
-              <Card>
+              <Card className="transition-shadow duration-200 hover:shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <AlertTriangle className="h-4 w-4 text-rose-600" />
-                    Weakness by Exam Stage
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-900/50">
+                      <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold">Weakness by Exam Stage</CardTitle>
+                      <CardDescription className="text-xs">
+                        Compare weakness levels across different exam stages
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {stageData.length > 0 ? (
@@ -442,12 +620,19 @@ export default function WeaknessHeatmapPage() {
             {examQuery.isLoading ? (
               <SectionSkeleton lines={4} />
             ) : (
-              <Card>
+              <Card className="transition-shadow duration-200 hover:shadow-md">
                 <CardHeader className="pb-2">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold">
-                    <Target className="h-4 w-4 text-amber-600" />
-                    Weakness by Exam
-                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+                      <Target className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-base font-semibold">Weakness by Exam</CardTitle>
+                      <CardDescription className="text-xs">
+                        How weakness scores vary across individual exams
+                      </CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {examData.length > 0 ? (
@@ -464,8 +649,9 @@ export default function WeaknessHeatmapPage() {
                           {examData.map((row, idx) => {
                             const r = row as Record<string, unknown>;
                             const weaknessScore = Number(r.weaknessScore ?? r.score ?? 0);
+                            const sev = getSeverityBadge(weaknessScore);
                             return (
-                              <TableRow key={idx}>
+                              <TableRow key={idx} className="transition-colors hover:bg-muted/30">
                                 <TableCell className="max-w-[140px] truncate text-xs font-medium text-foreground">
                                   {String(r.exam ?? r.name ?? `Exam ${idx + 1}`)}
                                 </TableCell>
@@ -473,12 +659,15 @@ export default function WeaknessHeatmapPage() {
                                   {String(r.score ?? '-')}
                                 </TableCell>
                                 <TableCell className="text-center">
-                                  <Badge
-                                    variant="outline"
-                                    className={`text-[11px] font-semibold ${getHeatmapCellClasses(weaknessScore)}`}
-                                  >
-                                    {weaknessScore}
-                                  </Badge>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <span className={cn('inline-block h-2 w-2 rounded-full', getHeatmapDotColor(weaknessScore))} />
+                                    <Badge
+                                      variant="outline"
+                                      className={cn('border text-[11px] font-semibold', sev.cls)}
+                                    >
+                                      {weaknessScore}
+                                    </Badge>
+                                  </div>
                                 </TableCell>
                               </TableRow>
                             );

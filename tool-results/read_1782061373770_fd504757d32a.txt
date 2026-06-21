@@ -1,0 +1,808 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useState } from 'react';
+     4→     4→import {
+     5→     5→  Target, Plus, CheckCircle2, Clock, AlertTriangle, TrendingUp, Calendar,
+     6→     6→  Star, ChevronRight, MoreHorizontal, Pencil, Trash2, Sparkles, Zap, BookOpen,
+     7→     7→  Flame, Lightbulb, X, Trophy, Rocket, PartyPopper,
+     8→     8→} from 'lucide-react';
+     9→     9→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+    10→    10→import { toast } from 'sonner';
+    11→    11→import { format, formatDistanceToNow, differenceInDays, isAfter, isBefore, parseISO } from 'date-fns';
+    12→    12→import {
+    13→    13→  getGoals, getGoalStats, getGoalStreak, getGoalTemplates,
+    14→    14→  createGoal, updateGoal, completeGoal, deleteGoal, getUpcomingExams,
+    15→    15→  type Goal,
+    16→    16→} from '@/lib/api';
+    17→    17→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    18→    18→import { Button } from '@/components/ui/button';
+    19→    19→import { Badge } from '@/components/ui/badge';
+    20→    20→import { Input } from '@/components/ui/input';
+    21→    21→import { Textarea } from '@/components/ui/textarea';
+    22→    22→import { Label } from '@/components/ui/label';
+    23→    23→import { Skeleton } from '@/components/ui/skeleton';
+    24→    24→import { ProgressBar } from '@/components/ui/ProgressBar';
+    25→    25→import { Slider } from '@/components/ui/slider';
+    26→    26→import { Separator } from '@/components/ui/separator';
+    27→    27→import {
+    28→    28→  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
+    29→    29→} from '@/components/ui/dialog';
+    30→    30→import {
+    31→    31→  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+    32→    32→} from '@/components/ui/dropdown-menu';
+    33→    33→import {
+    34→    34→  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+    35→    35→} from '@/components/ui/select';
+    36→    36→import { cn } from '@/lib/utils';
+    37→    37→
+    38→    38→const priorityConfig: Record<string, { color: string; badge: string; dot: string }> = {
+    39→    39→  high: { color: 'border-l-red-500', badge: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', dot: 'bg-red-500' },
+    40→    40→  medium: { color: 'border-l-amber-500', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', dot: 'bg-amber-500' },
+    41→    41→  low: { color: 'border-l-emerald-500', badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', dot: 'bg-emerald-500' },
+    42→    42→};
+    43→    43→
+    44→    44→const DEFAULT_TEMPLATES = [
+    45→    45→  { title: 'Daily Quant Practice', description: 'Solve 30+ quantitative aptitude questions daily covering all major topics', subject: 'Quantitative Aptitude', priority: 'high' },
+    46→    46→  { title: 'Weekly Mock Test', description: 'Take a full-length mock test every weekend and analyze your performance', subject: 'All Sections', priority: 'medium' },
+    47→    47→  { title: 'Current Affairs Revision', description: 'Stay updated with daily current affairs and revise weekly compilations', subject: 'General Awareness', priority: 'high' },
+    48→    48→  { title: 'English Vocabulary 500', description: 'Learn 500 new English words with meanings, synonyms, and antonyms', subject: 'English Language', priority: 'medium' },
+    49→    49→  { title: 'Reasoning Puzzle Practice', description: 'Practice 10+ complex puzzles daily including seating, scheduling, and coding-decoding', subject: 'Reasoning Ability', priority: 'medium' },
+    50→    50→  { title: 'Complete Syllabus Revision', description: 'Systematically revise all subjects with focus on weak areas and important formulas', subject: 'All Sections', priority: 'high' },
+    51→    51→  { title: 'Sectional Test Daily', description: 'Take one sectional test daily rotating through all exam sections', subject: 'All Sections', priority: 'medium' },
+    52→    52→  { title: 'Weak Area Focus', description: 'Identify and strengthen 2-3 weak topics per week with dedicated practice sessions', subject: 'Various', priority: 'high' },
+    53→    53→];
+    54→    54→
+    55→    55→function getDueCountdown(dueDate: string | null): { text: string; urgent: boolean } | null {
+    56→    56→  if (!dueDate) return null;
+    57→    57→  const days = differenceInDays(parseISO(dueDate), new Date());
+    58→    58→  if (days < 0) return { text: `Overdue by ${Math.abs(days)} day${Math.abs(days) !== 1 ? 's' : ''}`, urgent: true };
+    59→    59→  if (days === 0) return { text: 'Due today', urgent: true };
+    60→    60→  if (days === 1) return { text: 'Due tomorrow', urgent: true };
+    61→    61→  if (days <= 7) return { text: `Due in ${days} days`, urgent: true };
+    62→    62→  return { text: `Due in ${days} days`, urgent: false };
+    63→    63→}
+    64→    64→
+    65→    65→function CelebrationOverlay({ show }: { show: boolean }) {
+    66→    66→  if (!show) return null;
+    67→    67→  return (
+    68→    68→    <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
+    69→    69→      <div className="animate-in fade-in zoom-in-95 duration-300 flex flex-col items-center gap-3">
+    70→    70→        <div className="relative">
+    71→    71→          <div className="absolute inset-0 rounded-full bg-emerald-400/30 animate-ping" />
+    72→    72→          <div className="relative size-20 rounded-full bg-emerald-500 flex items-center justify-center">
+    73→    73→            <PartyPopper className="size-10 text-white" />
+    74→    74→          </div>
+    75→    75→        </div>
+    76→    76→        <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 animate-in slide-in-from-bottom-4 duration-500">
+    77→    77→          Goal Completed! 🎉
+    78→    78→        </p>
+    79→    79→      </div>
+    80→    80→    </div>
+    81→    81→  );
+    82→    82→}
+    83→    83→
+    84→    84→export default function GoalsPage() {
+    85→    85→  const queryClient = useQueryClient();
+    86→    86→  const [createOpen, setCreateOpen] = useState(false);
+    87→    87→  const [editOpen, setEditOpen] = useState(false);
+    88→    88→  const [progressOpen, setProgressOpen] = useState(false);
+    89→    89→  const [templatesOpen, setTemplatesOpen] = useState(false);
+    90→    90→  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+    91→    91→  const [progressValue, setProgressValue] = useState(50);
+    92→    92→  const [celebratingId, setCelebratingId] = useState<string | null>(null);
+    93→    93→
+    94→    94→  // Form state
+    95→    95→  const [form, setForm] = useState({ title: '', priority: 'medium', linkedExam: '', subject: '', dueDate: '', description: '' });
+    96→    96→  const resetForm = () => setForm({ title: '', priority: 'medium', linkedExam: '', subject: '', dueDate: '', description: '' });
+    97→    97→
+    98→    98→  // Queries
+    99→    99→  const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['goalStats'], queryFn: getGoalStats });
+   100→   100→  const { data: activeGoals, isLoading: activeLoading } = useQuery({ queryKey: ['goals', 'active'], queryFn: () => getGoals({ status: 'active' }) });
+   101→   101→  const { data: completedGoals, isLoading: completedLoading } = useQuery({ queryKey: ['goals', 'completed'], queryFn: () => getGoals({ status: 'completed' }) });
+   102→   102→  const { data: streak } = useQuery({ queryKey: ['goalStreak'], queryFn: getGoalStreak });
+   103→   103→  const { data: templates } = useQuery({ queryKey: ['goalTemplates'], queryFn: getGoalTemplates });
+   104→   104→  const { data: upcomingExams } = useQuery({ queryKey: ['upcomingExams'], queryFn: () => getUpcomingExams() });
+   105→   105→
+   106→   106→  // Mutations
+   107→   107→  const createMutation = useMutation({
+   108→   108→    mutationFn: createGoal,
+   109→   109→    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['goals'] }); queryClient.invalidateQueries({ queryKey: ['goalStats'] }); setCreateOpen(false); resetForm(); toast.success('Goal created!'); },
+   110→   110→    onError: () => toast.error('Failed to create goal'),
+   111→   111→  });
+   112→   112→  const updateMutation = useMutation({
+   113→   113→    mutationFn: ({ id, data }: { id: string; data: Partial<Goal> }) => updateGoal(id, data),
+   114→   114→    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['goals'] }); queryClient.invalidateQueries({ queryKey: ['goalStats'] }); setEditOpen(false); resetForm(); toast.success('Goal updated!'); },
+   115→   115→    onError: () => toast.error('Failed to update goal'),
+   116→   116→  });
+   117→   117→  const completeMutation = useMutation({
+   118→   118→    mutationFn: (goalId: string) => completeGoal(goalId),
+   119→   119→    onSuccess: (_data, goalId) => {
+   120→   120→      queryClient.invalidateQueries({ queryKey: ['goals'] });
+   121→   121→      queryClient.invalidateQueries({ queryKey: ['goalStats'] });
+   122→   122→      toast.success('Goal completed! 🎉');
+   123→   123→      setCelebratingId(goalId);
+   124→   124→      setTimeout(() => setCelebratingId(null), 2500);
+   125→   125→    },
+   126→   126→    onError: () => toast.error('Failed to complete goal'),
+   127→   127→  });
+   128→   128→  const progressMutation = useMutation({
+   129→   129→    mutationFn: ({ id, progress }: { id: string; progress: number }) => updateGoal(id, { progress }),
+   130→   130→    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['goals'] }); setProgressOpen(false); toast.success('Progress updated!'); },
+   131→   131→    onError: () => toast.error('Failed to update progress'),
+   132→   132→  });
+   133→   133→  const deleteMutation = useMutation({
+   134→   134→    mutationFn: deleteGoal,
+   135→   135→    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['goals'] }); queryClient.invalidateQueries({ queryKey: ['goalStats'] }); toast.success('Goal deleted'); },
+   136→   136→    onError: () => toast.error('Failed to delete goal'),
+   137→   137→  });
+   138→   138→
+   139→   139→  const handleCreate = () => {
+   140→   140→    if (!form.title.trim()) { toast.error('Title is required'); return; }
+   141→   141→    if (!form.dueDate) { toast.error('Due date is required'); return; }
+   142→   142→    createMutation.mutate({
+   143→   143→      title: form.title,
+   144→   144→      priority: form.priority,
+   145→   145→      linkedExam: form.linkedExam || undefined,
+   146→   146→      subject: form.subject || undefined,
+   147→   147→      dueDate: form.dueDate,
+   148→   148→      description: form.description || undefined,
+   149→   149→    });
+   150→   150→  };
+   151→   151→
+   152→   152→  const handleEdit = () => {
+   153→   153→    if (!selectedGoal || !form.title.trim()) { toast.error('Title is required'); return; }
+   154→   154→    updateMutation.mutate({ id: selectedGoal.id, data: form });
+   155→   155→  };
+   156→   156→
+   157→   157→  const openEdit = (goal: Goal) => {
+   158→   158→    setSelectedGoal(goal);
+   159→   159→    setForm({ title: goal.title, priority: goal.priority, linkedExam: goal.linkedExam || '', subject: goal.subject || '', dueDate: goal.dueDate || '', description: goal.description || '' });
+   160→   160→    setEditOpen(true);
+   161→   161→  };
+   162→   162→
+   163→   163→  const openProgress = (goal: Goal) => {
+   164→   164→    setSelectedGoal(goal);
+   165→   165→    setProgressValue(goal.progress);
+   166→   166→    setProgressOpen(true);
+   167→   167→  };
+   168→   168→
+   169→   169→  const applyTemplate = (t: { title: string; description: string; subject: string; priority: string }) => {
+   170→   170→    setForm(f => ({ ...f, title: t.title, description: t.description, subject: t.subject, priority: t.priority }));
+   171→   171→    setTemplatesOpen(false);
+   172→   172→    setCreateOpen(true);
+   173→   173→  };
+   174→   174→
+   175→   175→  const completionRate = stats ? (stats.active + stats.completed > 0 ? Math.round((stats.completed / (stats.active + stats.completed)) * 100) : 0) : 0;
+   176→   176→  const weekDots = streak?.weekDots || '0000000';
+   177→   177→  const allTemplates = templates && templates.length > 0 ? templates : DEFAULT_TEMPLATES;
+   178→   178→
+   179→   179→  if (statsLoading || activeLoading) {
+   180→   180→    return (
+   181→   181→      <div className="space-y-6">
+   182→   182→        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+   183→   183→          {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+   184→   184→        </div>
+   185→   185→        <Skeleton className="h-32 rounded-xl" />
+   186→   186→        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+   187→   187→          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-40 rounded-xl" />)}
+   188→   188→        </div>
+   189→   189→      </div>
+   190→   190→    );
+   191→   191→  }
+   192→   192→
+   193→   193→  return (
+   194→   194→    <div className="space-y-6">
+   195→   195→      {/* Celebration Overlay */}
+   196→   196→      <CelebrationOverlay show={!!celebratingId} />
+   197→   197→
+   198→   198→      {/* Stat Cards */}
+   199→   199→      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+   200→   200→        <Card className="gap-0 py-0">
+   201→   201→          <CardHeader className="flex flex-row items-center justify-between pb-2">
+   202→   202→            <CardTitle className="text-sm font-medium text-muted-foreground">Active Goals</CardTitle>
+   203→   203→            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+   204→   204→              <Target className="size-4" />
+   205→   205→            </div>
+   206→   206→          </CardHeader>
+   207→   207→          <CardContent className="pb-4">
+   208→   208→            <div className="text-2xl font-bold">{stats?.active ?? 0}</div>
+   209→   209→          </CardContent>
+   210→   210→        </Card>
+   211→   211→
+   212→   212→        <Card className="gap-0 py-0">
+   213→   213→          <CardHeader className="flex flex-row items-center justify-between pb-2">
+   214→   214→            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+   215→   215→            <div className="flex size-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
+   216→   216→              <CheckCircle2 className="size-4" />
+   217→   217→            </div>
+   218→   218→          </CardHeader>
+   219→   219→          <CardContent className="pb-4">
+   220→   220→            <div className="text-2xl font-bold">{stats?.completed ?? 0}</div>
+   221→   221→          </CardContent>
+   222→   222→        </Card>
+   223→   223→
+   224→   224→        <Card className="gap-0 py-0">
+   225→   225→          <CardHeader className="flex flex-row items-center justify-between pb-2">
+   226→   226→            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
+   227→   227→            <div className="flex size-8 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">
+   228→   228→              <AlertTriangle className="size-4" />
+   229→   229→            </div>
+   230→   230→          </CardHeader>
+   231→   231→          <CardContent className="pb-4">
+   232→   232→            <div className="text-2xl font-bold">{stats?.overdue ?? 0}</div>
+   233→   233→          </CardContent>
+   234→   234→        </Card>
+   235→   235→
+   236→   236→        <Card className="gap-0 py-0">
+   237→   237→          <CardHeader className="flex flex-row items-center justify-between pb-2">
+   238→   238→            <CardTitle className="text-sm font-medium text-muted-foreground">Completion Rate</CardTitle>
+   239→   239→            <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+   240→   240→              <TrendingUp className="size-4" />
+   241→   241→            </div>
+   242→   242→          </CardHeader>
+   243→   243→          <CardContent className="pb-4">
+   244→   244→            <div className="text-2xl font-bold">{completionRate}%</div>
+   245→   245→          </CardContent>
+   246→   246→        </Card>
+   247→   247→
+   248→   248→        <Card className="gap-0 py-0 col-span-2 sm:col-span-1">
+   249→   249→          <CardHeader className="flex flex-row items-center justify-between pb-2">
+   250→   250→            <CardTitle className="text-sm font-medium text-muted-foreground">Next Goal Due</CardTitle>
+   251→   251→            <div className="flex size-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300">
+   252→   252→              <Clock className="size-4" />
+   253→   253→            </div>
+   254→   254→          </CardHeader>
+   255→   255→          <CardContent className="pb-4">
+   256→   256→            <div className="text-lg font-bold truncate">
+   257→   257→              {stats?.nextDue ? formatDistanceToNow(parseISO(stats.nextDue.dueDate!), { addSuffix: true }) : '—'}
+   258→   258→            </div>
+   259→   259→          </CardContent>
+   260→   260→        </Card>
+   261→   261→      </div>
+   262→   262→
+   263→   263→      {/* Action Buttons */}
+   264→   264→      <div className="flex flex-wrap gap-3">
+   265→   265→        <Dialog open={templatesOpen} onOpenChange={setTemplatesOpen}>
+   266→   266→          <DialogTrigger asChild>
+   267→   267→            <Button variant="outline" className="gap-2">
+   268→   268→              <Sparkles className="size-4" /> Goal Templates
+   269→   269→            </Button>
+   270→   270→          </DialogTrigger>
+   271→   271→          <DialogContent className="max-w-lg max-h-[85vh]">
+   272→   272→            <DialogHeader>
+   273→   273→              <DialogTitle>Goal Templates</DialogTitle>
+   274→   274→              <DialogDescription>Choose a template to get started quickly</DialogDescription>
+   275→   275→            </DialogHeader>
+   276→   276→            <div className="space-y-3 max-h-[55vh] overflow-y-auto mt-2 pr-1">
+   277→   277→              {allTemplates.map((t, i) => (
+   278→   278→                <Card key={i} className="cursor-pointer hover:border-emerald-500 transition-all hover:shadow-sm" onClick={() => applyTemplate(t)}>
+   279→   279→                  <CardContent className="p-4 flex items-start gap-3">
+   280→   280→                    <div className={cn(
+   281→   281→                      'flex size-9 shrink-0 items-center justify-center rounded-lg mt-0.5',
+   282→   282→                      t.priority === 'high' ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400' :
+   283→   283→                      t.priority === 'medium' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400' :
+   284→   284→                      'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+   285→   285→                    )}>
+   286→   286→                      <Zap className="size-4" />
+   287→   287→                    </div>
+   288→   288→                    <div className="flex-1 min-w-0">
+   289→   289→                      <p className="font-medium text-sm">{t.title}</p>
+   290→   290→                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.description}</p>
+   291→   291→                      <div className="flex gap-2 mt-1.5">
+   292→   292→                        <Badge variant="secondary" className="text-xs">{t.subject}</Badge>
+   293→   293→                        <Badge className={cn('text-xs', priorityConfig[t.priority]?.badge)}>{t.priority}</Badge>
+   294→   294→                      </div>
+   295→   295→                    </div>
+   296→   296→                    <ChevronRight className="size-4 text-muted-foreground shrink-0 mt-1" />
+   297→   297→                  </CardContent>
+   298→   298→                </Card>
+   299→   299→              ))}
+   300→   300→            </div>
+   301→   301→          </DialogContent>
+   302→   302→        </Dialog>
+   303→   303→
+   304→   304→        <Dialog open={createOpen} onOpenChange={(open) => { setCreateOpen(open); if (!open) resetForm(); }}>
+   305→   305→          <DialogTrigger asChild>
+   306→   306→            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+   307→   307→              <Plus className="size-4" /> New Goal
+   308→   308→            </Button>
+   309→   309→          </DialogTrigger>
+   310→   310→          <DialogContent className="max-w-lg">
+   311→   311→            <DialogHeader>
+   312→   312→              <DialogTitle>Create New Goal</DialogTitle>
+   313→   313→              <DialogDescription>Set a new study goal to track your progress</DialogDescription>
+   314→   314→            </DialogHeader>
+   315→   315→            <div className="space-y-4 mt-2">
+   316→   316→              <div>
+   317→   317→                <Label htmlFor="goal-title">Title *</Label>
+   318→   318→                <Input id="goal-title" className="mt-1.5" placeholder="e.g. Complete Quant chapter 5" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} />
+   319→   319→                {!form.title.trim() && (
+   320→   320→                  <p className="text-xs text-red-500 mt-1">Title is required</p>
+   321→   321→                )}
+   322→   322→              </div>
+   323→   323→              <div className="grid grid-cols-2 gap-4">
+   324→   324→                <div>
+   325→   325→                  <Label htmlFor="goal-priority">Priority</Label>
+   326→   326→                  <Select value={form.priority} onValueChange={(v) => setForm(f => ({ ...f, priority: v }))}>
+   327→   327→                    <SelectTrigger id="goal-priority" className="mt-1.5"><SelectValue /></SelectTrigger>
+   328→   328→                    <SelectContent>
+   329→   329→                      <SelectItem value="high">High</SelectItem>
+   330→   330→                      <SelectItem value="medium">Medium</SelectItem>
+   331→   331→                      <SelectItem value="low">Low</SelectItem>
+   332→   332→                    </SelectContent>
+   333→   333→                  </Select>
+   334→   334→                </div>
+   335→   335→                <div>
+   336→   336→                  <Label htmlFor="goal-exam">Linked Exam</Label>
+   337→   337→                  <Select value={form.linkedExam} onValueChange={(v) => setForm(f => ({ ...f, linkedExam: v }))}>
+   338→   338→                    <SelectTrigger id="goal-exam" className="mt-1.5">
+   339→   339→                      <SelectValue placeholder="Select exam" />
+   340→   340→                    </SelectTrigger>
+   341→   341→                    <SelectContent>
+   342→   342→                      {upcomingExams?.map((exam) => (
+   343→   343→                        <SelectItem key={exam.id} value={exam.name}>{exam.name}</SelectItem>
+   344→   344→                      ))}
+   345→   345→                      {(!upcomingExams || upcomingExams.length === 0) && (
+   346→   346→                        <SelectItem value="custom" disabled>No exams available</SelectItem>
+   347→   347→                      )}
+   348→   348→                    </SelectContent>
+   349→   349→                  </Select>
+   350→   350→                </div>
+   351→   351→              </div>
+   352→   352→              <div className="grid grid-cols-2 gap-4">
+   353→   353→                <div>
+   354→   354→                  <Label htmlFor="goal-subject">Subject</Label>
+   355→   355→                  <Input id="goal-subject" className="mt-1.5" placeholder="e.g. Mathematics" value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} />
+   356→   356→                </div>
+   357→   357→                <div>
+   358→   358→                  <Label htmlFor="goal-due">Due Date *</Label>
+   359→   359→                  <Input id="goal-due" type="date" className="mt-1.5" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+   360→   360→                  {!form.dueDate && (
+   361→   361→                    <p className="text-xs text-red-500 mt-1">Due date is required</p>
+   362→   362→                  )}
+   363→   363→                </div>
+   364→   364→              </div>
+   365→   365→              <div>
+   366→   366→                <Label htmlFor="goal-desc">Description</Label>
+   367→   367→                <Textarea id="goal-desc" className="mt-1.5" rows={3} placeholder="Describe your goal..." value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
+   368→   368→              </div>
+   369→   369→            </div>
+   370→   370→            <DialogFooter>
+   371→   371→              <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
+   372→   372→              <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleCreate} disabled={createMutation.isPending || !form.title.trim() || !form.dueDate}>
+   373→   373→                {createMutation.isPending ? 'Creating...' : 'Create Goal'}
+   374→   374→              </Button>
+   375→   375→            </DialogFooter>
+   376→   376→          </DialogContent>
+   377→   377→        </Dialog>
+   378→   378→      </div>
+   379→   379→
+   380→   380→      {/* Main Content Grid */}
+   381→   381→      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+   382→   382→        {/* Left - Goals List */}
+   383→   383→        <div className="lg:col-span-2 space-y-6">
+   384→   384→          {/* Today's Focus */}
+   385→   385→          {stats?.nextDue ? (
+   386→   386→            <div className="relative overflow-hidden rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-700 p-[1px]">
+   387→   387→              <div className="rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/40 dark:to-teal-950/40 p-5">
+   388→   388→                <div className="flex items-center gap-3 mb-4">
+   389→   389→                  <div className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-600/30">
+   390→   390→                    <Rocket className="size-5" />
+   391→   391→                    <span className="absolute -top-0.5 -right-0.5 flex size-3">
+   392→   392→                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" />
+   393→   393→                      <span className="relative inline-flex size-3 rounded-full bg-white" />
+   394→   394→                    </span>
+   395→   395→                  </div>
+   396→   396→                  <div className="flex-1 min-w-0">
+   397→   397→                    <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Today&apos;s Focus</p>
+   398→   398→                    <p className="text-base font-bold text-emerald-900 dark:text-emerald-100 truncate">{stats.nextDue.title}</p>
+   399→   399→                  </div>
+   400→   400→                  {stats.nextDue.subject && (
+   401→   401→                    <Badge className="bg-emerald-200/80 text-emerald-800 dark:bg-emerald-800/60 dark:text-emerald-200 text-xs border-0">
+   402→   402→                      {stats.nextDue.subject}
+   403→   403→                    </Badge>
+   404→   404→                  )}
+   405→   405→                </div>
+   406→   406→                <div className="mb-4">
+   407→   407→                  <div className="flex items-center justify-between mb-1.5">
+   408→   408→                    <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Progress</span>
+   409→   409→                    <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{stats.nextDue.progress}%</span>
+   410→   410→                  </div>
+   411→   411→                  <div className="w-full h-3 rounded-full bg-emerald-200 dark:bg-emerald-900/60 overflow-hidden">
+   412→   412→                    <div
+   413→   413→                      className="h-full rounded-full bg-emerald-600 dark:bg-emerald-500 transition-all duration-700 ease-out"
+   414→   414→                      style={{ width: `${stats.nextDue.progress}%` }}
+   415→   415→                    />
+   416→   416→                  </div>
+   417→   417→                </div>
+   418→   418→                <div className="flex items-center gap-3">
+   419→   419→                  <Button
+   420→   420→                    size="sm"
+   421→   421→                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20"
+   422→   422→                    onClick={() => completeMutation.mutate(stats.nextDue!.id)}
+   423→   423→                    disabled={completeMutation.isPending}
+   424→   424→                  >
+   425→   425→                    <CheckCircle2 className="size-4 mr-1.5" /> Mark Complete
+   426→   426→                  </Button>
+   427→   427→                  <Button
+   428→   428→                    size="sm"
+   429→   429→                    variant="outline"
+   430→   430→                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:text-emerald-300 dark:hover:bg-emerald-900/40"
+   431→   431→                    onClick={() => openProgress(stats.nextDue!)}
+   432→   432→                  >
+   433→   433→                    Update Progress
+   434→   434→                  </Button>
+   435→   435→                </div>
+   436→   436→              </div>
+   437→   437→            </div>
+   438→   438→          ) : (
+   439→   439→            <Card className="border-dashed border-2 border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+   440→   440→              <CardContent className="p-6 flex flex-col items-center text-center">
+   441→   441→                <div className="size-14 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center mb-3">
+   442→   442→                  <Rocket className="size-7 text-emerald-600 dark:text-emerald-400" />
+   443→   443→                </div>
+   444→   444→                <p className="font-semibold text-emerald-800 dark:text-emerald-200">No active goals yet</p>
+   445→   445→                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+   446→   446→                  Start your journey by creating a goal. Every step counts towards your dream career!
+   447→   447→                </p>
+   448→   448→                <Button
+   449→   449→                  className="mt-4 bg-emerald-600 hover:bg-emerald-700"
+   450→   450→                  onClick={() => setCreateOpen(true)}
+   451→   451→                >
+   452→   452→                  <Plus className="size-4 mr-1.5" /> Create Your First Goal
+   453→   453→                </Button>
+   454→   454→              </CardContent>
+   455→   455→            </Card>
+   456→   456→          )}
+   457→   457→
+   458→   458→          {/* Active Goals */}
+   459→   459→          <div>
+   460→   460→            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+   461→   461→              <Target className="size-5 text-emerald-600" /> Active Goals
+   462→   462→              <Badge variant="secondary" className="ml-1">{activeGoals?.length ?? 0}</Badge>
+   463→   463→            </h3>
+   464→   464→            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+   465→   465→              {activeGoals?.map((goal) => {
+   466→   466→                const pc = priorityConfig[goal.priority] || priorityConfig.medium;
+   467→   467→                const isOverdue = goal.dueDate && isBefore(parseISO(goal.dueDate), new Date());
+   468→   468→                const countdown = getDueCountdown(goal.dueDate);
+   469→   469→                return (
+   470→   470→                  <Card
+   471→   471→                    key={goal.id}
+   472→   472→                    className={cn(
+   473→   473→                      'border-l-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+   474→   474→                      pc.color,
+   475→   475→                    )}
+   476→   476→                  >
+   477→   477→                    <CardContent className="p-4">
+   478→   478→                      <div className="flex items-start justify-between mb-2">
+   479→   479→                        <div className="flex-1 min-w-0">
+   480→   480→                          <p className="font-semibold text-sm truncate">{goal.title}</p>
+   481→   481→                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+   482→   482→                            <Badge className={cn('text-xs', pc.badge)}>{goal.priority}</Badge>
+   483→   483→                            {goal.subject && <Badge variant="outline" className="text-xs">{goal.subject}</Badge>}
+   484→   484→                          </div>
+   485→   485→                        </div>
+   486→   486→                        <DropdownMenu>
+   487→   487→                          <DropdownMenuTrigger asChild>
+   488→   488→                            <Button variant="ghost" size="icon" className="size-8 shrink-0">
+   489→   489→                              <MoreHorizontal className="size-4" />
+   490→   490→                            </Button>
+   491→   491→                          </DropdownMenuTrigger>
+   492→   492→                          <DropdownMenuContent align="end">
+   493→   493→                            <DropdownMenuItem onClick={() => openProgress(goal)}>
+   494→   494→                              <TrendingUp className="size-4 mr-2" />Update Progress
+   495→   495→                            </DropdownMenuItem>
+   496→   496→                            <DropdownMenuItem onClick={() => openEdit(goal)}>
+   497→   497→                              <Pencil className="size-4 mr-2" />Edit
+   498→   498→                            </DropdownMenuItem>
+   499→   499→                            <DropdownMenuItem onClick={() => deleteMutation.mutate(goal.id)} className="text-red-600">
+   500→   500→                              <Trash2 className="size-4 mr-2" />Delete
+   501→   501→                            </DropdownMenuItem>
+   502→   502→                          </DropdownMenuContent>
+   503→   503→                        </DropdownMenu>
+   504→   504→                      </div>
+   505→   505→
+   506→   506→                      <div className="space-y-1 text-xs text-muted-foreground mb-3">
+   507→   507→                        {goal.linkedExam && <p className="flex items-center gap-1"><BookOpen className="size-3" />{goal.linkedExam}</p>}
+   508→   508→                        {goal.dueDate && (
+   509→   509→                          <p className={cn(isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : '')}>
+   510→   510→                            <Calendar className="size-3 inline mr-1" />
+   511→   511→                            {format(parseISO(goal.dueDate), 'MMM d, yyyy')}
+   512→   512→                          </p>
+   513→   513→                        )}
+   514→   514→                        {countdown && (
+   515→   515→                          <p className={cn(
+   516→   516→                            countdown.urgent
+   517→   517→                              ? 'text-amber-600 dark:text-amber-400 font-medium'
+   518→   518→                              : 'text-muted-foreground'
+   519→   519→                          )}>
+   520→   520→                            <Clock className="size-3 inline mr-1" />
+   521→   521→                            {countdown.text}
+   522→   522→                          </p>
+   523→   523→                        )}
+   524→   524→                      </div>
+   525→   525→
+   526→   526→                      <ProgressBar percent={goal.progress} showValue className="mb-3" />
+   527→   527→
+   528→   528→                      <div className="flex gap-2">
+   529→   529→                        <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => openProgress(goal)}>
+   530→   530→                          <TrendingUp className="size-3 mr-1" /> Update Progress
+   531→   531→                        </Button>
+   532→   532→                        <Button
+   533→   533→                          size="sm"
+   534→   534→                          className="text-xs h-7 bg-emerald-600 hover:bg-emerald-700"
+   535→   535→                          onClick={() => completeMutation.mutate(goal.id)}
+   536→   536→                          disabled={completeMutation.isPending}
+   537→   537→                        >
+   538→   538→                          <CheckCircle2 className="size-3 mr-1" /> Complete
+   539→   539→                        </Button>
+   540→   540→                      </div>
+   541→   541→                    </CardContent>
+   542→   542→                  </Card>
+   543→   543→                );
+   544→   544→              })}
+   545→   545→              {(!activeGoals || activeGoals.length === 0) && (
+   546→   546→                <div className="col-span-full text-center py-8 text-muted-foreground">
+   547→   547→                  <Target className="size-10 mx-auto mb-2 opacity-30" />
+   548→   548→                  <p className="text-sm">No active goals. Create one to get started!</p>
+   549→   549→                </div>
+   550→   550→              )}
+   551→   551→            </div>
+   552→   552→          </div>
+   553→   553→
+   554→   554→          {/* Completed Goals */}
+   555→   555→          <div>
+   556→   556→            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+   557→   557→              <Trophy className="size-5 text-amber-500" /> Completed Goals
+   558→   558→              <Badge variant="secondary" className="ml-1">{completedGoals?.length ?? 0}</Badge>
+   559→   559→            </h3>
+   560→   560→            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+   561→   561→              {completedGoals?.map((goal) => (
+   562→   562→                <Card key={goal.id} className="opacity-80 hover:opacity-100 transition-opacity">
+   563→   563→                  <CardContent className="p-3 flex items-start gap-2">
+   564→   564→                    <CheckCircle2 className="size-5 text-teal-600 shrink-0 mt-0.5" />
+   565→   565→                    <div className="min-w-0">
+   566→   566→                      <p className="text-sm font-medium truncate">{goal.title}</p>
+   567→   567→                      <p className="text-xs text-muted-foreground">
+   568→   568→                        {goal.completedAt ? format(parseISO(goal.completedAt), 'MMM d') : 'Done'}
+   569→   569→                      </p>
+   570→   570→                    </div>
+   571→   571→                  </CardContent>
+   572→   572→                </Card>
+   573→   573→              ))}
+   574→   574→              {(!completedGoals || completedGoals.length === 0) && (
+   575→   575→                <div className="col-span-full text-center py-6 text-muted-foreground text-sm">
+   576→   576→                  No completed goals yet. Keep going!
+   577→   577→                </div>
+   578→   578→              )}
+   579→   579→            </div>
+   580→   580→          </div>
+   581→   581→        </div>
+   582→   582→
+   583→   583→        {/* Right Sidebar */}
+   584→   584→        <div className="space-y-6">
+   585→   585→          {/* Study Streak - Prominent */}
+   586→   586→          <Card className="border-emerald-200 dark:border-emerald-800">
+   587→   587→            <CardContent className="p-5">
+   588→   588→              <div className="flex items-center gap-2 mb-4">
+   589→   589→                <div className="flex size-9 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/40">
+   590→   590→                  <Flame className="size-5 text-orange-500" />
+   591→   591→                </div>
+   592→   592→                <CardTitle className="text-sm font-semibold">Study Streak</CardTitle>
+   593→   593→              </div>
+   594→   594→              <div className="text-center mb-4">
+   595→   595→                <p className="text-5xl font-extrabold tracking-tight text-emerald-600 dark:text-emerald-400">
+   596→   596→                  {streak?.currentStreak ?? 0}
+   597→   597→                </p>
+   598→   598→                <p className="text-sm font-medium text-muted-foreground mt-1">day streak</p>
+   599→   599→              </div>
+   600→   600→              <div className="flex gap-2.5 justify-center mb-3">
+   601→   601→                {weekDots.split('').map((d, i) => (
+   602→   602→                  <div
+   603→   603→                    key={i}
+   604→   604→                    className={cn(
+   605→   605→                      'size-5 rounded-full transition-all',
+   606→   606→                      d === '1'
+   607→   607→                        ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30'
+   608→   608→                        : 'bg-gray-200 dark:bg-gray-700'
+   609→   609→                    )}
+   610→   610→                    title={['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][i]}
+   611→   611→                  />
+   612→   612→                ))}
+   613→   613→              </div>
+   614→   614→              <div className="flex justify-between px-1 mb-4">
+   615→   615→                {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+   616→   616→                  <span key={i} className="text-[10px] text-muted-foreground w-5 text-center">{d}</span>
+   617→   617→                ))}
+   618→   618→              </div>
+   619→   619→              <Separator className="mb-3" />
+   620→   620→              <div className="flex items-center justify-between">
+   621→   621→                <span className="text-xs text-muted-foreground">Longest streak</span>
+   622→   622→                <span className="text-sm font-bold text-amber-600 dark:text-amber-400">
+   623→   623→                  {streak?.longestStreak ?? 0} days
+   624→   624→                </span>
+   625→   625→              </div>
+   626→   626→            </CardContent>
+   627→   627→          </Card>
+   628→   628→
+   629→   629→          {/* Upcoming Deadlines */}
+   630→   630→          <Card>
+   631→   631→            <CardHeader className="pb-3">
+   632→   632→              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   633→   633→                <Clock className="size-4 text-amber-500" /> Upcoming Deadlines
+   634→   634→              </CardTitle>
+   635→   635→            </CardHeader>
+   636→   636→            <CardContent className="space-y-3">
+   637→   637→              {activeGoals?.filter(g => g.dueDate).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!)).slice(0, 3).map((g) => {
+   638→   638→                const cd = getDueCountdown(g.dueDate);
+   639→   639→                return (
+   640→   640→                  <div key={g.id} className="flex items-center justify-between">
+   641→   641→                    <div className="flex items-center gap-2 min-w-0">
+   642→   642→                      <div className={cn('size-2 rounded-full shrink-0', priorityConfig[g.priority]?.dot)} />
+   643→   643→                      <span className="text-sm truncate">{g.title}</span>
+   644→   644→                    </div>
+   645→   645→                    <span className={cn('text-xs whitespace-nowrap', cd?.urgent ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-muted-foreground')}>
+   646→   646→                      {cd?.text ?? '—'}
+   647→   647→                    </span>
+   648→   648→                  </div>
+   649→   649→                );
+   650→   650→              }) || <p className="text-sm text-muted-foreground">No upcoming deadlines</p>}
+   651→   651→            </CardContent>
+   652→   652→          </Card>
+   653→   653→
+   654→   654→          {/* Priority Goals */}
+   655→   655→          <Card>
+   656→   656→            <CardHeader className="pb-3">
+   657→   657→              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   658→   658→                <AlertTriangle className="size-4 text-red-500" /> Priority Goals
+   659→   659→              </CardTitle>
+   660→   660→            </CardHeader>
+   661→   661→            <CardContent className="space-y-3">
+   662→   662→              {activeGoals?.filter(g => g.priority === 'high').slice(0, 3).map((g) => (
+   663→   663→                <div key={g.id} className="flex items-center gap-2">
+   664→   664→                  <div className="size-2 rounded-full bg-red-500 shrink-0" />
+   665→   665→                  <span className="text-sm truncate">{g.title}</span>
+   666→   666→                </div>
+   667→   667→              )) || <p className="text-sm text-muted-foreground">No high priority goals</p>}
+   668→   668→            </CardContent>
+   669→   669→          </Card>
+   670→   670→
+   671→   671→          {/* Smart Suggestions */}
+   672→   672→          <Card>
+   673→   673→            <CardHeader className="pb-3">
+   674→   674→              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+   675→   675→                <Lightbulb className="size-4 text-amber-500" /> Smart Suggestions
+   676→   676→              </CardTitle>
+   677→   677→            </CardHeader>
+   678→   678→            <CardContent className="space-y-3">
+   679→   679→              {[
+   680→   680→                'Break large goals into smaller weekly targets',
+   681→   681→                'Review your study schedule and adjust timelines',
+   682→   682→                'Focus on overdue goals first for quick wins',
+   683→   683→              ].map((s, i) => (
+   684→   684→                <div key={i} className="flex items-start gap-2">
+   685→   685→                  <Star className="size-3.5 text-amber-500 mt-0.5 shrink-0" />
+   686→   686→                  <p className="text-xs text-muted-foreground">{s}</p>
+   687→   687→                </div>
+   688→   688→              ))}
+   689→   689→            </CardContent>
+   690→   690→          </Card>
+   691→   691→        </div>
+   692→   692→      </div>
+   693→   693→
+   694→   694→      {/* Edit Goal Dialog */}
+   695→   695→      <Dialog open={editOpen} onOpenChange={(open) => { setEditOpen(open); if (!open) resetForm(); }}>
+   696→   696→        <DialogContent className="max-w-lg">
+   697→   697→          <DialogHeader>
+   698→   698→            <DialogTitle>Edit Goal</DialogTitle>
+   699→   699→            <DialogDescription>Update your goal details</DialogDescription>
+   700→   700→          </DialogHeader>
+   701→   701→          <div className="space-y-4 mt-2">
+   702→   702→            <div>
+   703→   703→              <Label htmlFor="edit-title">Title *</Label>
+   704→   704→              <Input id="edit-title" className="mt-1.5" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} />
+   705→   705→            </div>
+   706→   706→            <div className="grid grid-cols-2 gap-4">
+   707→   707→              <div>
+   708→   708→                <Label htmlFor="edit-priority">Priority</Label>
+   709→   709→                <Select value={form.priority} onValueChange={(v) => setForm(f => ({ ...f, priority: v }))}>
+   710→   710→                  <SelectTrigger id="edit-priority" className="mt-1.5"><SelectValue /></SelectTrigger>
+   711→   711→                  <SelectContent>
+   712→   712→                    <SelectItem value="high">High</SelectItem>
+   713→   713→                    <SelectItem value="medium">Medium</SelectItem>
+   714→   714→                    <SelectItem value="low">Low</SelectItem>
+   715→   715→                  </SelectContent>
+   716→   716→                </Select>
+   717→   717→              </div>
+   718→   718→              <div>
+   719→   719→                <Label htmlFor="edit-exam">Linked Exam</Label>
+   720→   720→                <Select value={form.linkedExam} onValueChange={(v) => setForm(f => ({ ...f, linkedExam: v }))}>
+   721→   721→                  <SelectTrigger id="edit-exam" className="mt-1.5">
+   722→   722→                    <SelectValue placeholder="Select exam" />
+   723→   723→                  </SelectTrigger>
+   724→   724→                  <SelectContent>
+   725→   725→                    {upcomingExams?.map((exam) => (
+   726→   726→                      <SelectItem key={exam.id} value={exam.name}>{exam.name}</SelectItem>
+   727→   727→                    ))}
+   728→   728→                  </SelectContent>
+   729→   729→                </Select>
+   730→   730→              </div>
+   731→   731→            </div>
+   732→   732→            <div className="grid grid-cols-2 gap-4">
+   733→   733→              <div>
+   734→   734→                <Label htmlFor="edit-subject">Subject</Label>
+   735→   735→                <Input id="edit-subject" className="mt-1.5" value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} />
+   736→   736→              </div>
+   737→   737→              <div>
+   738→   738→                <Label htmlFor="edit-due">Due Date</Label>
+   739→   739→                <Input id="edit-due" type="date" className="mt-1.5" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} />
+   740→   740→              </div>
+   741→   741→            </div>
+   742→   742→            <div>
+   743→   743→              <Label htmlFor="edit-desc">Description</Label>
+   744→   744→              <Textarea id="edit-desc" className="mt-1.5" rows={3} value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
+   745→   745→            </div>
+   746→   746→          </div>
+   747→   747→          <DialogFooter>
+   748→   748→            <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+   749→   749→            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleEdit} disabled={updateMutation.isPending}>
+   750→   750→              {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
+   751→   751→            </Button>
+   752→   752→          </DialogFooter>
+   753→   753→        </DialogContent>
+   754→   754→      </Dialog>
+   755→   755→
+   756→   756→      {/* Update Progress Dialog */}
+   757→   757→      <Dialog open={progressOpen} onOpenChange={setProgressOpen}>
+   758→   758→        <DialogContent className="max-w-md">
+   759→   759→          <DialogHeader>
+   760→   760→            <DialogTitle>Update Progress</DialogTitle>
+   761→   761→            <DialogDescription>Adjust the progress for &ldquo;{selectedGoal?.title}&rdquo;</DialogDescription>
+   762→   762→          </DialogHeader>
+   763→   763→          <div className="py-6">
+   764→   764→            <div className="text-center mb-6">
+   765→   765→              <div className="relative inline-block">
+   766→   766→                <span className="text-5xl font-extrabold text-emerald-600 dark:text-emerald-400">{progressValue}%</span>
+   767→   767→                {progressValue === 100 && (
+   768→   768→                  <Trophy className="size-6 text-amber-500 absolute -top-2 -right-6" />
+   769→   769→                )}
+   770→   770→              </div>
+   771→   771→              <p className="text-sm text-muted-foreground mt-2">
+   772→   772→                {progressValue === 0 && 'Just getting started!'}
+   773→   773→                {progressValue > 0 && progressValue < 25 && 'Great start, keep going!'}
+   774→   774→                {progressValue >= 25 && progressValue < 50 && 'Making solid progress!'}
+   775→   775→                {progressValue >= 50 && progressValue < 75 && 'You\'re halfway there!'}
+   776→   776→                {progressValue >= 75 && progressValue < 100 && 'Almost there, finish strong!'}
+   777→   777→                {progressValue === 100 && 'Ready to mark complete! 🎉'}
+   778→   778→              </p>
+   779→   779→            </div>
+   780→   780→            <Slider
+   781→   781→              value={[progressValue]}
+   782→   782→              min={0}
+   783→   783→              max={100}
+   784→   784→              step={5}
+   785→   785→              onValueChange={(v) => setProgressValue(v[0])}
+   786→   786→              className="mb-2"
+   787→   787→            />
+   788→   788→            <div className="flex justify-between">
+   789→   789→              <span className="text-xs text-muted-foreground">0%</span>
+   790→   790→              <span className="text-xs text-muted-foreground">100%</span>
+   791→   791→            </div>
+   792→   792→          </div>
+   793→   793→          <DialogFooter>
+   794→   794→            <Button variant="outline" onClick={() => setProgressOpen(false)}>Cancel</Button>
+   795→   795→            <Button
+   796→   796→              className="bg-emerald-600 hover:bg-emerald-700"
+   797→   797→              onClick={() => selectedGoal && progressMutation.mutate({ id: selectedGoal.id, progress: progressValue })}
+   798→   798→              disabled={progressMutation.isPending}
+   799→   799→            >
+   800→   800→              {progressMutation.isPending ? 'Updating...' : 'Update'}
+   801→   801→            </Button>
+   802→   802→          </DialogFooter>
+   803→   803→        </DialogContent>
+   804→   804→      </Dialog>
+   805→   805→    </div>
+   806→   806→  );
+   807→   807→}
+   808→   808→

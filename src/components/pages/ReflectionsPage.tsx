@@ -8,28 +8,32 @@ import {
 } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
-  ArrowLeft,
-  Save,
-  X,
-  Upload,
+  Plus,
   FileText,
-  GripVertical,
+  Smile,
+  Frown,
+  Meh,
+  Angry,
   ChevronDown,
+  ChevronUp,
+  PenLine,
+  BookOpen,
+  BrainCircuit,
+  Target,
+  Heart,
+  Sparkles,
 } from 'lucide-react';
 import { useNavigationStore } from '@/store/navigation';
 import {
   getReflectionExamOptions,
-  getReflection,
   getReflections,
   getExam,
   createReflection,
-  updateReflection,
   type Reflection,
-  type ReflectionSection,
   type Exam,
 } from '@/lib/api';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -37,6 +41,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -45,833 +51,721 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 // ── Constants ────────────────────────────────────────────────
 const DIFFICULTY_OPTIONS = ['Easy', 'Moderate', 'Hard', 'Very Hard'];
-const EMOTIONAL_OPTIONS = ['Confident', 'Anxious', 'Neutral', 'Frustrated'];
-const MISTAKE_TAG_OPTIONS = [
-  'Time Management',
-  'Concept Gap',
-  'Silly Mistakes',
-  'Calculation Errors',
-  'Pressure Handling',
-  'Guessing',
-  'Revision Gap',
-  'Speed Issues',
-  'Accuracy',
-  'Question Selection',
-];
-const STRENGTH_TAG_OPTIONS = [
-  'Strong in Reasoning',
-  'Good Speed',
-  'Accurate in English',
-  'Strong Quant',
-  'Good GK',
-  'Puzzle Solver',
-  'Fast Reader',
-];
-const REMINDER_TYPE_OPTIONS = [
-  '1 Day Before',
-  '3 Days Before',
-  '1 Week Before',
-  'Custom',
-];
+const EMOTIONAL_OPTIONS = ['Confident', 'Anxious', 'Neutral', 'Disappointed'];
 
-interface SectionReflection {
-  section: string;
-  score: string;
-  strength: string;
-  weakness: string;
-  actionPlan: string;
+const EMOTIONAL_CONFIG: Record<string, { icon: React.ElementType; cls: string; bg: string }> = {
+  Confident: {
+    icon: Smile,
+    cls: 'text-emerald-700 dark:text-emerald-300',
+    bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+  },
+  Anxious: {
+    icon: Frown,
+    cls: 'text-amber-700 dark:text-amber-300',
+    bg: 'bg-amber-100 dark:bg-amber-900/50',
+  },
+  Neutral: {
+    icon: Meh,
+    cls: 'text-slate-700 dark:text-slate-300',
+    bg: 'bg-slate-100 dark:bg-slate-900/50',
+  },
+  Disappointed: {
+    icon: Angry,
+    cls: 'text-rose-700 dark:text-rose-300',
+    bg: 'bg-rose-100 dark:bg-rose-900/50',
+  },
+};
+
+const DIFFICULTY_CONFIG: Record<string, { cls: string; border: string }> = {
+  Easy: { cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800', border: 'border-l-emerald-500' },
+  Moderate: { cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-800', border: 'border-l-amber-500' },
+  Hard: { cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 border-orange-200 dark:border-orange-800', border: 'border-l-orange-500' },
+  'Very Hard': { cls: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800', border: 'border-l-red-500' },
+};
+
+// ── Empty State ──────────────────────────────────────────────
+function EmptyReflectionState({ onCreateClick }: { onCreateClick: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/30 px-6 py-16 text-center">
+      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
+        <PenLine className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+      </div>
+      <h3 className="mb-2 text-lg font-semibold text-foreground">No Reflections Yet</h3>
+      <p className="max-w-md text-sm text-muted-foreground">
+        Reflections help you learn from each exam. Track what went well, identify mistakes,
+        and create action plans to improve your performance.
+      </p>
+      <Button
+        className="mt-6 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+        onClick={onCreateClick}
+      >
+        <Plus className="mr-2 h-4 w-4" />
+        Write Your First Reflection
+      </Button>
+    </div>
+  );
 }
 
-// ── Component ────────────────────────────────────────────────
-export default function ReflectionsPage() {
-  const { navigate, previousPage } = useNavigationStore();
+// ── Reflection Card ──────────────────────────────────────────
+function ReflectionCard({ reflection }: { reflection: Reflection }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const emotionalCfg = EMOTIONAL_CONFIG[reflection.emotionalState ?? ''] ?? EMOTIONAL_CONFIG.Neutral;
+  const diffCfg = DIFFICULTY_CONFIG[reflection.difficulty ?? ''] ?? null;
+  const EmotionIcon = emotionalCfg.icon;
+
+  const hasContent =
+    reflection.whatWentWell || reflection.whatWentWrong || reflection.biggestLesson || reflection.actionPlan;
+  const contentLength = [
+    reflection.whatWentWell,
+    reflection.whatWentWrong,
+    reflection.biggestLesson,
+    reflection.actionPlan,
+  ].filter(Boolean).join('').length;
+  const isLong = contentLength > 300;
+
+  return (
+    <Card
+      className={cn(
+        'border-l-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
+        diffCfg?.border ?? 'border-l-slate-300 dark:border-l-slate-700',
+      )}
+    >
+      <CardContent className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg', emotionalCfg.bg)}>
+              <EmotionIcon className={cn('h-5 w-5', emotionalCfg.cls)} />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold text-foreground truncate">
+                {reflection.examName}
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                {reflection.examDate
+                  ? new Date(reflection.examDate).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    })
+                  : 'No date'}
+                {reflection.score != null && ` · Score: ${reflection.score}`}
+                {reflection.result && (
+                  <span
+                    className={cn(
+                      'ml-1 font-medium',
+                      reflection.result.toLowerCase().includes('qualified')
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-red-600 dark:text-red-400',
+                    )}
+                  >
+                    · {reflection.result}
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {reflection.difficulty && (
+              <Badge variant="outline" className={cn('border text-[11px] font-semibold', diffCfg?.cls)}>
+                {reflection.difficulty}
+              </Badge>
+            )}
+            <Badge variant="secondary" className={cn('text-[11px] font-medium', emotionalCfg.bg, emotionalCfg.cls)}>
+              <EmotionIcon className="mr-1 h-3 w-3" />
+              {reflection.emotionalState}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Confidence */}
+        {reflection.confidence != null && (
+          <div className="mt-3">
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-muted-foreground">Confidence Level</span>
+              <span className={cn(
+                'font-semibold',
+                reflection.confidence >= 70
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : reflection.confidence >= 40
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-red-600 dark:text-red-400',
+              )}>
+                {reflection.confidence}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all duration-500',
+                  reflection.confidence >= 70
+                    ? 'bg-emerald-500'
+                    : reflection.confidence >= 40
+                      ? 'bg-amber-500'
+                      : 'bg-red-500',
+                )}
+                style={{ width: `${reflection.confidence}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Content sections */}
+        {hasContent && (
+          <div className={cn('mt-3 space-y-2', !expanded && isLong && 'max-h-40 overflow-hidden relative')}>
+            {reflection.whatWentWell && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-0.5">
+                  <Smile className="inline h-3 w-3 mr-1" />What Went Well
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {reflection.whatWentWell}
+                </p>
+              </div>
+            )}
+            {reflection.whatWentWrong && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-0.5">
+                  <Frown className="inline h-3 w-3 mr-1" />What Went Wrong
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {reflection.whatWentWrong}
+                </p>
+              </div>
+            )}
+            {reflection.biggestLesson && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
+                  <Sparkles className="inline h-3 w-3 mr-1" />Biggest Lesson
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {reflection.biggestLesson}
+                </p>
+              </div>
+            )}
+            {reflection.actionPlan && (
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-0.5">
+                  <Target className="inline h-3 w-3 mr-1" />Action Plan
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {reflection.actionPlan}
+                </p>
+              </div>
+            )}
+            {!expanded && isLong && (
+              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
+            )}
+          </div>
+        )}
+
+        {/* Target Score & Footer */}
+        <div className="mt-3 flex items-center justify-between">
+          {reflection.targetScore != null && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Target className="h-3.5 w-3.5" />
+              <span>Target: <span className="font-semibold text-foreground">{reflection.targetScore}</span></span>
+            </div>
+          )}
+          {isLong && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-muted-foreground"
+              onClick={() => setExpanded(!expanded)}
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="mr-1 h-3 w-3" /> Show Less
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="mr-1 h-3 w-3" /> Show More
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+
+        {/* Mistake Tags */}
+        {reflection.mistakeTags && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {reflection.mistakeTags.split(',').filter(Boolean).map((tag) => (
+              <Badge key={tag} variant="outline" className="text-[10px] border-rose-200 text-rose-600 dark:border-rose-800 dark:text-rose-400">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Strength Tags */}
+        {reflection.strengthTags && (
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {reflection.strengthTags.split(',').filter(Boolean).map((tag) => (
+              <Badge key={tag} variant="outline" className="text-[10px] border-emerald-200 text-emerald-600 dark:border-emerald-800 dark:text-emerald-400">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ── Create Reflection Dialog ─────────────────────────────────
+function CreateReflectionDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const queryClient = useQueryClient();
+  const { navigate } = useNavigationStore();
 
-  // editing reflection id (passed via store or query param style)
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
-  const [manualExamData, setExamData] = useState<Exam | null>(null);
-
-  // Form state
+  const [examId, setExamId] = useState('');
   const [difficulty, setDifficulty] = useState('');
   const [confidence, setConfidence] = useState(50);
   const [emotionalState, setEmotionalState] = useState('');
-  const [mistakeTags, setMistakeTags] = useState<string[]>([]);
-  const [strengthTags, setStrengthTags] = useState<string[]>([]);
-  const [whatWentWrong, setWhatWentWrong] = useState('');
   const [whatWentWell, setWhatWentWell] = useState('');
+  const [whatWentWrong, setWhatWentWrong] = useState('');
   const [biggestLesson, setBiggestLesson] = useState('');
   const [actionPlan, setActionPlan] = useState('');
   const [targetScore, setTargetScore] = useState('');
-  const [goalDescription, setGoalDescription] = useState('');
-  const [manualSections, setSectionReflections] = useState<SectionReflection[]>([]);
-  const [attachments, setAttachments] = useState<string[]>([]);
-  const [reminderType, setReminderType] = useState('');
-  const [reminderDate, setReminderDate] = useState('');
 
-  // ── Queries ─────────────────────────────────────────────
   const { data: examOptions, isLoading: loadingOptions } = useQuery({
     queryKey: ['reflection-exam-options'],
     queryFn: getReflectionExamOptions,
   });
 
-  const { data: reflections, isLoading: loadingReflections } = useQuery({
-    queryKey: ['reflections-list'],
-    queryFn: () => getReflections(),
-  });
-
   const { data: selectedExam, isLoading: loadingExam } = useQuery({
-    queryKey: ['exam-for-reflection', selectedExamId],
-    queryFn: () => getExam(selectedExamId!),
-    enabled: !!selectedExamId,
+    queryKey: ['exam-for-dialog', examId],
+    queryFn: () => getExam(examId),
+    enabled: !!examId,
   });
 
-  // Derive examData from query result (avoids synchronous setState in effect)
-  const derivedExamData = selectedExam;
-  const derivedSections = selectedExam?.sectionalScores?.length
-    ? selectedExam.sectionalScores.map((s) => ({
-        section: s.section,
-        score: String(s.score ?? ''),
-        strength: '',
-        weakness: '',
-        actionPlan: '',
-      }))
-    : [];
-  // examData and sectionReflections prefer manually-set values (from loadReflection), else use query-derived
-  const examData = manualExamData || derivedExamData;
-  const sectionReflections = manualSections.length > 0 ? manualSections : derivedSections;
-
-  // ── Load existing reflection ────────────────────────────
-  const loadReflection = useCallback(
-    (r: Reflection) => {
-      setEditingId(r.id);
-      if (r.examId) {
-        setSelectedExamId(r.examId);
-        getExam(r.examId).then((exam) => {
-          setExamData(exam);
-          if (exam.sectionalScores?.length) {
-            const sectionMap = new Map(
-              r.sections?.map((s) => [s.section, s]) ?? []
-            );
-            setSectionReflections(
-              exam.sectionalScores.map((s) => {
-                const existing = sectionMap.get(s.section);
-                return {
-                  section: s.section,
-                  score: existing?.score != null ? String(existing.score) : String(s.score ?? ''),
-                  strength: existing?.strength ?? '',
-                  weakness: existing?.weakness ?? '',
-                  actionPlan: existing?.actionPlan ?? '',
-                };
-              })
-            );
-          }
-        });
-      }
-      setDifficulty(r.difficulty ?? '');
-      setConfidence(r.confidence ?? 50);
-      setEmotionalState(r.emotionalState ?? '');
-      setMistakeTags(r.mistakeTags ? r.mistakeTags.split(',').filter(Boolean) : []);
-      setStrengthTags(r.strengthTags ? r.strengthTags.split(',').filter(Boolean) : []);
-      setWhatWentWrong(r.whatWentWrong ?? '');
-      setWhatWentWell(r.whatWentWell ?? '');
-      setBiggestLesson(r.biggestLesson ?? '');
-      setActionPlan(r.actionPlan ?? '');
-      setTargetScore(r.targetScore != null ? String(r.targetScore) : '');
-      setGoalDescription(r.goalDescription ?? '');
-      setReminderType(r.reminderType ?? '');
-      setReminderDate(r.reminderDate ?? '');
-    },
-    []
-  );
-
-  // ── Mutations ───────────────────────────────────────────
-  const saveMutation = useMutation({
-    mutationFn: (data: Parameters<typeof createReflection>[0]) => {
-      if (editingId) return updateReflection(editingId, data);
-      return createReflection(data);
-    },
+  const createMutation = useMutation({
+    mutationFn: createReflection,
     onSuccess: () => {
-      toast.success(editingId ? 'Reflection updated!' : 'Reflection saved!');
+      toast.success('Reflection created successfully!');
       queryClient.invalidateQueries({ queryKey: ['reflections'] });
       queryClient.invalidateQueries({ queryKey: ['reflection-exam-options'] });
-      queryClient.invalidateQueries({ queryKey: ['exams'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
       queryClient.invalidateQueries({ queryKey: ['weakness'] });
-      navigate('history');
+      onOpenChange(false);
+      resetForm();
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Failed to save reflection');
+      toast.error(err.message || 'Failed to create reflection');
     },
   });
 
-  // ── Handlers ────────────────────────────────────────────
-  const toggleTag = (tag: string, list: string[], setter: (v: string[]) => void) => {
-    setter(list.includes(tag) ? list.filter((t) => t !== tag) : [...list, tag]);
+  const resetForm = () => {
+    setExamId('');
+    setDifficulty('');
+    setConfidence(50);
+    setEmotionalState('');
+    setWhatWentWell('');
+    setWhatWentWrong('');
+    setBiggestLesson('');
+    setActionPlan('');
+    setTargetScore('');
   };
 
-  const updateSection = (idx: number, field: keyof SectionReflection, value: string) => {
-    setSectionReflections((prev) =>
-      prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s))
-    );
-  };
-
-  const handleSave = () => {
-    if (!selectedExamId) {
+  const handleSubmit = () => {
+    if (!examId) {
       toast.error('Please select an exam');
       return;
     }
-    const payload: Parameters<typeof createReflection>[0] = {
-      examId: selectedExamId,
-      examName: examData?.name ?? '',
-      examDate: examData?.examDate ?? null,
-      score: examData?.score ?? null,
-      cutoff: examData?.cutoff ?? null,
-      gap: examData?.cutoffGap ?? null,
-      result: examData?.result ?? null,
+    createMutation.mutate({
+      examId,
+      examName: selectedExam?.name ?? '',
+      examDate: selectedExam?.examDate ?? null,
+      score: selectedExam?.score ?? null,
+      cutoff: selectedExam?.cutoff ?? null,
+      gap: selectedExam?.cutoffGap ?? null,
+      result: selectedExam?.result ?? null,
       difficulty: difficulty || null,
       confidence,
       emotionalState: emotionalState || null,
-      mistakeTags: mistakeTags.length ? mistakeTags.join(',') : null,
-      strengthTags: strengthTags.length ? strengthTags.join(',') : null,
       whatWentWrong: whatWentWrong || null,
       whatWentWell: whatWentWell || null,
       biggestLesson: biggestLesson || null,
       actionPlan: actionPlan || null,
       targetScore: targetScore ? Number(targetScore) : null,
-      goalDescription: goalDescription || null,
-      reminderType: reminderType || null,
-      reminderDate: reminderDate || null,
-      sections: sectionReflections.map((s) => ({
-        section: s.section,
-        score: s.score ? Number(s.score) : undefined,
-        strength: s.strength || undefined,
-        weakness: s.weakness || undefined,
-        actionPlan: s.actionPlan || undefined,
-      })),
-    };
-    saveMutation.mutate(payload);
+    });
   };
 
-  const handleCancel = () => {
-    resetForm();
-    if (previousPage && previousPage !== 'reflections') {
-      navigate(previousPage);
-    } else {
-      navigate('history');
-    }
-  };
-
-  const resetForm = () => {
-    setEditingId(null);
-    setSelectedExamId(null);
-    setExamData(null);
-    setDifficulty('');
-    setConfidence(50);
-    setEmotionalState('');
-    setMistakeTags([]);
-    setStrengthTags([]);
-    setWhatWentWrong('');
-    setWhatWentWell('');
-    setBiggestLesson('');
-    setActionPlan('');
-    setTargetScore('');
-    setGoalDescription('');
-    setSectionReflections([]);
-    setAttachments([]);
-    setReminderType('');
-    setReminderDate('');
-  };
-
-  const handleSelectExam = (examId: string) => {
-    if (editingId) return; // don't switch exam when editing
-    resetForm();
-    setSelectedExamId(examId);
-  };
-
-  const addAttachment = (name: string) => {
-    setAttachments((prev) => [...prev, name]);
-  };
-
-  const removeAttachment = (idx: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  // ── Render helpers ──────────────────────────────────────
   const ToggleButton = ({
     label,
     active,
     onClick,
+    activeColor,
   }: {
     label: string;
     active: boolean;
     onClick: () => void;
+    activeColor?: string;
   }) => (
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full border px-4 py-1.5 text-sm font-medium transition-colors ${
+      className={cn(
+        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200',
         active
-          ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-          : 'border-border bg-background text-muted-foreground hover:border-emerald-400 hover:text-emerald-600'
-      }`}
+          ? activeColor
+            ? activeColor
+            : 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+          : 'border-border bg-background text-muted-foreground hover:border-emerald-400 hover:text-emerald-600',
+      )}
     >
       {label}
     </button>
   );
 
-  const resultColor = (r: string) => {
-    if (r === 'Qualified' || r === 'qualified') return 'text-emerald-600 dark:text-emerald-400';
-    if (r === 'Not Qualified' || r === 'not-qualified') return 'text-red-600 dark:text-red-400';
-    return 'text-muted-foreground';
-  };
+  return (
+    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <PenLine className="h-5 w-5 text-emerald-600" />
+            Create Reflection
+          </DialogTitle>
+          <DialogDescription>
+            Write a detailed reflection for your exam to track progress
+          </DialogDescription>
+        </DialogHeader>
 
-  // ── Loading state ───────────────────────────────────────
-  if (loadingOptions && loadingReflections) {
+        <div className="space-y-5 mt-2">
+          {/* Exam Selection */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">
+              Select Exam <span className="text-red-500">*</span>
+            </Label>
+            <Select value={examId} onValueChange={setExamId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose an exam..." />
+              </SelectTrigger>
+              <SelectContent>
+                {examOptions?.map((e) => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.name} — {e.examDate}
+                  </SelectItem>
+                ))}
+                {(!examOptions || examOptions.length === 0) && !loadingOptions && (
+                  <SelectItem value="__none" disabled>
+                    No exams available
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Exam Summary */}
+          {loadingExam && examId && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+              <Skeleton className="h-4 w-40" />
+              <Skeleton className="mt-2 h-3 w-24" />
+            </div>
+          )}
+          {selectedExam && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+              <p className="text-sm font-semibold text-foreground">{selectedExam.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {selectedExam.examDate} · {selectedExam.category} · Score: {selectedExam.score}/{selectedExam.maxScore}
+                {selectedExam.result && (
+                  <span className={cn(
+                    'ml-1 font-medium',
+                    selectedExam.result.toLowerCase().includes('qualified')
+                      ? 'text-emerald-600 dark:text-emerald-400'
+                      : 'text-red-600 dark:text-red-400',
+                  )}>
+                    · {selectedExam.result}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Difficulty */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Difficulty Level</Label>
+            <div className="flex flex-wrap gap-2">
+              {DIFFICULTY_OPTIONS.map((d) => (
+                <ToggleButton
+                  key={d}
+                  label={d}
+                  active={difficulty === d}
+                  onClick={() => setDifficulty(difficulty === d ? '' : d)}
+                  activeColor={
+                    d === 'Easy' ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                    : d === 'Moderate' ? 'border-amber-500 bg-amber-500/15 text-amber-700 dark:text-amber-400'
+                    : d === 'Hard' ? 'border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-400'
+                    : 'border-red-500 bg-red-500/15 text-red-700 dark:text-red-400'
+                  }
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Confidence Slider */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium">Confidence Level</Label>
+              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{confidence}%</span>
+            </div>
+            <Slider
+              value={[confidence]}
+              onValueChange={(v) => setConfidence(v[0])}
+              min={0}
+              max={100}
+              step={5}
+              className="[&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:border-emerald-500"
+            />
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>Not Confident</span>
+              <span>Very Confident</span>
+            </div>
+          </div>
+
+          {/* Emotional State */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Emotional State</Label>
+            <div className="flex flex-wrap gap-2">
+              {EMOTIONAL_OPTIONS.map((e) => {
+                const cfg = EMOTIONAL_CONFIG[e];
+                return (
+                  <ToggleButton
+                    key={e}
+                    label={e}
+                    active={emotionalState === e}
+                    onClick={() => setEmotionalState(emotionalState === e ? '' : e)}
+                    activeColor={cn('border', cfg.cls, cfg.bg.replace('dark:', 'dark:').replace('100', '500/15').replace('50', '500/15'))}
+                  />
+                );
+              })}
+            </div>
+          </div>
+
+          <Separator />
+
+          {/* What Went Well */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Smile className="h-3.5 w-3.5 text-emerald-500" /> What Went Well
+            </Label>
+            <Textarea
+              placeholder="Describe what went well in the exam..."
+              value={whatWentWell}
+              onChange={(e) => setWhatWentWell(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+
+          {/* What Went Wrong */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Frown className="h-3.5 w-3.5 text-rose-500" /> What Went Wrong
+            </Label>
+            <Textarea
+              placeholder="Describe what didn't go as planned..."
+              value={whatWentWrong}
+              onChange={(e) => setWhatWentWrong(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+
+          {/* Biggest Lesson */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Biggest Lesson
+            </Label>
+            <Textarea
+              placeholder="What's the most important thing you learned?"
+              value={biggestLesson}
+              onChange={(e) => setBiggestLesson(e.target.value)}
+              rows={2}
+              className="resize-none"
+            />
+          </div>
+
+          {/* Action Plan */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium flex items-center gap-1.5">
+              <Target className="h-3.5 w-3.5 text-teal-500" /> Action Plan
+            </Label>
+            <Textarea
+              placeholder="What specific actions will you take before the next attempt?"
+              value={actionPlan}
+              onChange={(e) => setActionPlan(e.target.value)}
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+
+          {/* Target Score */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Target Score for Next Attempt</Label>
+            <Input
+              type="number"
+              placeholder="e.g. 85"
+              value={targetScore}
+              onChange={(e) => setTargetScore(e.target.value)}
+              className="max-w-[200px]"
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={createMutation.isPending || !examId}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {createMutation.isPending ? 'Saving...' : 'Save Reflection'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────
+export default function ReflectionsPage() {
+  const navigate = useNavigationStore();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const { data: reflections, isLoading } = useQuery({
+    queryKey: ['reflections-list'],
+    queryFn: () => getReflections(),
+  });
+
+  const existingReflections = reflections ?? [];
+
+  if (isLoading) {
     return (
-      <div className="space-y-6 p-4 md:p-6">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-48" />
-        <Skeleton className="h-12 w-full" />
-        <Skeleton className="h-64 w-full" />
-        <Skeleton className="h-48 w-full" />
+        <Skeleton className="h-8 w-40" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-64 rounded-xl" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  const existingReflections = reflections ?? [];
-
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       {/* ── Header ──────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate(previousPage ?? 'history')}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="size-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Exam Reflection</h1>
-            <p className="text-sm text-muted-foreground">
-              {editingId ? 'Edit your reflection' : 'Create a detailed reflection for an exam'}
-            </p>
-          </div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+            Reflections
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review and learn from your exam experiences
+          </p>
         </div>
         <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate('history')}
-          className="self-start sm:self-auto"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800"
+          onClick={() => setCreateDialogOpen(true)}
         >
-          <ArrowLeft className="mr-1.5 size-3.5" />
-          Back to History
+          <Plus className="mr-2 h-4 w-4" />
+          Create Reflection
         </Button>
       </div>
 
-      {/* ── Existing reflections (when no exam selected) ── */}
-      {!selectedExamId && !editingId && (
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Select Exam to Reflect On</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={selectedExamId ?? ''} onValueChange={handleSelectExam}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Choose an exam..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {examOptions?.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name} — {e.examDate}
-                    </SelectItem>
-                  ))}
-                  {(!examOptions || examOptions.length === 0) && (
-                    <SelectItem value="__none" disabled>
-                      No exams available
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {existingReflections.length > 0 && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Existing Reflections</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {existingReflections.map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => loadReflection(r)}
-                      className="flex w-full items-center justify-between rounded-lg border p-3 text-left hover:bg-muted/50 transition-colors"
-                    >
-                      <div>
-                        <p className="font-medium text-sm">{r.examName}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {r.examDate} · Score: {r.score} · {r.difficulty}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="text-xs shrink-0">
-                        {r.emotionalState}
-                      </Badge>
-                    </button>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+      {/* ── Stats Summary ── */}
+      {existingReflections.length > 0 && (
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {[
+            {
+              icon: BookOpen,
+              label: 'Total Reflections',
+              value: existingReflections.length,
+              bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+              iconCls: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              icon: Smile,
+              label: 'Confident Entries',
+              value: existingReflections.filter((r) => r.emotionalState === 'Confident').length,
+              bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+              iconCls: 'text-emerald-600 dark:text-emerald-400',
+            },
+            {
+              icon: BrainCircuit,
+              label: 'Avg Confidence',
+              value: `${Math.round(
+                existingReflections.reduce((a, r) => a + (r.confidence ?? 50), 0) / existingReflections.length,
+              )}%`,
+              bg: 'bg-teal-100 dark:bg-teal-900/50',
+              iconCls: 'text-teal-600 dark:text-teal-400',
+            },
+            {
+              icon: Heart,
+              label: 'With Action Plan',
+              value: existingReflections.filter((r) => r.actionPlan).length,
+              bg: 'bg-amber-100 dark:bg-amber-900/50',
+              iconCls: 'text-amber-600 dark:text-amber-400',
+            },
+          ].map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <Card key={stat.label} className="transition-shadow duration-200 hover:shadow-md">
+                <CardContent className="flex items-center gap-3 p-4">
+                  <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg', stat.bg)}>
+                    <Icon className={cn('h-5 w-5', stat.iconCls)} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold text-foreground">{stat.value}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {/* ── Reflection Form ─────────────────────────────── */}
-      {selectedExamId && (
-        <div className="space-y-6">
-          {/* Exam Summary Card */}
-          <Card className="border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10">
-            <CardContent className="p-4">
-              {loadingExam ? (
-                <div className="flex items-center gap-4">
-                  <Skeleton className="h-16 w-16 rounded-lg" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-5 w-40" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
-                </div>
-              ) : examData ? (
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="flex size-12 items-center justify-center rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
-                      <FileText className="size-6" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold">{examData.name}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {examData.examDate} · {examData.category} · Attempt #{examData.attempt}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="text-center">
-                      <p className="text-muted-foreground text-xs">Score</p>
-                      <p className="font-semibold">{examData.score}/{examData.maxScore}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-muted-foreground text-xs">Cutoff</p>
-                      <p className="font-semibold">{examData.cutoff}</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-muted-foreground text-xs">Gap</p>
-                      <p className={`font-semibold ${examData.cutoffGap != null && examData.cutoffGap < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {examData.cutoffGap != null ? `${examData.cutoffGap > 0 ? '+' : ''}${examData.cutoffGap}` : '—'}
-                      </p>
-                    </div>
-                    <Badge
-                      variant={examData.result === 'Qualified' || examData.result === 'qualified' ? 'default' : 'destructive'}
-                      className={examData.result === 'Qualified' || examData.result === 'qualified' ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600' : ''}
-                    >
-                      {examData.result}
-                    </Badge>
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {/* 1. Exam Experience */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">1. Exam Experience</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label>Difficulty Level</Label>
-                <div className="flex flex-wrap gap-2">
-                  {DIFFICULTY_OPTIONS.map((d) => (
-                    <ToggleButton
-                      key={d}
-                      label={d}
-                      active={difficulty === d}
-                      onClick={() => setDifficulty(difficulty === d ? '' : d)}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Confidence Level</Label>
-                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                    {confidence}%
-                  </span>
-                </div>
-                <Slider
-                  value={[confidence]}
-                  onValueChange={(v) => setConfidence(v[0])}
-                  min={0}
-                  max={100}
-                  step={5}
-                  className="[&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:border-emerald-500"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Not Confident</span>
-                  <span>Very Confident</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Emotional State</Label>
-                <div className="flex flex-wrap gap-2">
-                  {EMOTIONAL_OPTIONS.map((e) => (
-                    <ToggleButton
-                      key={e}
-                      label={e}
-                      active={emotionalState === e}
-                      onClick={() => setEmotionalState(emotionalState === e ? '' : e)}
-                    />
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 2. Mistake Tags */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">2. Mistake Tags</CardTitle>
-              <p className="text-xs text-muted-foreground">Select the mistakes you made</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {MISTAKE_TAG_OPTIONS.map((tag) => (
-                  <ToggleButton
-                    key={tag}
-                    label={tag}
-                    active={mistakeTags.includes(tag)}
-                    onClick={() => toggleTag(tag, mistakeTags, setMistakeTags)}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 3. Strength Tags */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">3. Strength Tags</CardTitle>
-              <p className="text-xs text-muted-foreground">Select areas where you performed well</p>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {STRENGTH_TAG_OPTIONS.map((tag) => (
-                  <ToggleButton
-                    key={tag}
-                    label={tag}
-                    active={strengthTags.includes(tag)}
-                    onClick={() => toggleTag(tag, strengthTags, setStrengthTags)}
-                  />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 4. What Went Wrong */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">4. What Went Wrong</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Describe what didn't go as planned..."
-                value={whatWentWrong}
-                onChange={(e) => setWhatWentWrong(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-            </CardContent>
-          </Card>
-
-          {/* 5. What Went Well */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">5. What Went Well</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Describe what went well..."
-                value={whatWentWell}
-                onChange={(e) => setWhatWentWell(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-            </CardContent>
-          </Card>
-
-          {/* 6. Biggest Lesson */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">6. Biggest Lesson</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="What's the most important thing you learned from this exam?"
-                value={biggestLesson}
-                onChange={(e) => setBiggestLesson(e.target.value)}
-                rows={3}
-                className="resize-none"
-              />
-            </CardContent>
-          </Card>
-
-          {/* 7. Action Plan */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">7. Action Plan</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="What specific actions will you take before the next attempt?"
-                value={actionPlan}
-                onChange={(e) => setActionPlan(e.target.value)}
-                rows={4}
-                className="resize-none"
-              />
-            </CardContent>
-          </Card>
-
-          {/* 8. Next Attempt Goal */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">8. Next Attempt Goal</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Target Score</Label>
-                  <Input
-                    type="number"
-                    placeholder="e.g. 85"
-                    value={targetScore}
-                    onChange={(e) => setTargetScore(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Current Score</Label>
-                  <Input
-                    type="text"
-                    value={examData?.score ?? '—'}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Goal Description</Label>
-                <Textarea
-                  placeholder="Describe your goal for the next attempt..."
-                  value={goalDescription}
-                  onChange={(e) => setGoalDescription(e.target.value)}
-                  rows={3}
-                  className="resize-none"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 9. Section-wise Reflection */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">9. Section-wise Reflection</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Analyze each section of the exam
-              </p>
-            </CardHeader>
-            <CardContent>
-              {sectionReflections.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  No sectional data available for this exam.
-                </p>
-              ) : (
-                <div className="overflow-x-auto -mx-2">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-[120px]">Section</TableHead>
-                        <TableHead className="min-w-[80px]">Score</TableHead>
-                        <TableHead className="min-w-[140px]">Strength</TableHead>
-                        <TableHead className="min-w-[140px]">Weakness</TableHead>
-                        <TableHead className="min-w-[160px]">Action Plan</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sectionReflections.map((sec, idx) => (
-                        <TableRow key={sec.section}>
-                          <TableCell className="font-medium text-sm">
-                            {sec.section}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              placeholder="—"
-                              value={sec.score}
-                              onChange={(e) => updateSection(idx, 'score', e.target.value)}
-                              className="h-8 w-20 text-sm"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              placeholder="Strength..."
-                              value={sec.strength}
-                              onChange={(e) => updateSection(idx, 'strength', e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              placeholder="Weakness..."
-                              value={sec.weakness}
-                              onChange={(e) => updateSection(idx, 'weakness', e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              placeholder="Action plan..."
-                              value={sec.actionPlan}
-                              onChange={(e) => updateSection(idx, 'actionPlan', e.target.value)}
-                              className="h-8 text-sm"
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 10. Attachments */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">10. Attachments</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Add notes, screenshots, or reference materials
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div
-                className="flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-muted-foreground/25 p-6 text-center transition-colors hover:border-emerald-500/50 hover:bg-emerald-500/5 cursor-pointer"
-                onClick={() => {
-                  const name = `attachment-${attachments.length + 1}.png`;
-                  addAttachment(name);
-                  toast.success(`Added ${name}`);
-                }}
-              >
-                <Upload className="size-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Click to add attachment
-                </p>
-              </div>
-              {attachments.length > 0 && (
-                <div className="space-y-2">
-                  {attachments.map((file, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between rounded-lg border p-2.5"
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileText className="size-4 text-muted-foreground" />
-                        <span className="text-sm">{file}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
-                        onClick={() => removeAttachment(idx)}
-                      >
-                        <X className="size-3.5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* 11. Reminder */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">11. Reminder</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Set a reminder for your next study session or exam prep
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Reminder Type</Label>
-                  <Select value={reminderType} onValueChange={setReminderType}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {REMINDER_TYPE_OPTIONS.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Reminder Date</Label>
-                  <Input
-                    type="date"
-                    value={reminderDate}
-                    onChange={(e) => setReminderDate(e.target.value)}
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── Footer Buttons ─────────────────────────────── */}
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end pt-2">
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              className="min-w-[120px]"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saveMutation.isPending}
-              className="min-w-[160px] bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              <Save className="mr-2 size-4" />
-              {saveMutation.isPending
-                ? 'Saving...'
-                : editingId
-                  ? 'Update Reflection'
-                  : 'Save Reflection'}
-            </Button>
-          </div>
+      {/* ── Reflections List ── */}
+      {existingReflections.length === 0 ? (
+        <EmptyReflectionState onCreateClick={() => setCreateDialogOpen(true)} />
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {existingReflections.map((r) => (
+            <ReflectionCard key={r.id} reflection={r} />
+          ))}
         </div>
       )}
+
+      {/* ── Create Dialog ── */}
+      <CreateReflectionDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      />
     </div>
   );
 }

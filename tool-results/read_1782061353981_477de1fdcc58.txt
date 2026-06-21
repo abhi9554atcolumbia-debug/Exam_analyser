@@ -1,0 +1,918 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo } from 'react';
+     4→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+     5→import { toast } from 'sonner';
+     6→import {
+     7→  GraduationCap,
+     8→  Trophy,
+     9→  BarChart3,
+    10→  Star,
+    11→  Filter,
+    12→  ChevronDown,
+    13→  ChevronUp,
+    14→  Plus,
+    15→  X,
+    16→  CheckCircle2,
+    17→  XCircle,
+    18→  BookOpen,
+    19→  ExternalLink,
+    20→  ArrowUpDown,
+    21→  Eye,
+    22→  FileText,
+    23→  Loader2,
+    24→  SearchX,
+    25→} from 'lucide-react';
+    26→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    27→import { Button } from '@/components/ui/button';
+    28→import { Badge } from '@/components/ui/badge';
+    29→import { Input } from '@/components/ui/input';
+    30→import { Label } from '@/components/ui/label';
+    31→import { Skeleton } from '@/components/ui/skeleton';
+    32→import {
+    33→  Dialog,
+    34→  DialogContent,
+    35→  DialogHeader,
+    36→  DialogTitle,
+    37→  DialogFooter,
+    38→  DialogClose,
+    39→} from '@/components/ui/dialog';
+    40→import {
+    41→  Select,
+    42→  SelectContent,
+    43→  SelectItem,
+    44→  SelectTrigger,
+    45→  SelectValue,
+    46→} from '@/components/ui/select';
+    47→import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+    48→import {
+    49→  Sheet,
+    50→  SheetContent,
+    51→  SheetHeader,
+    52→  SheetTitle,
+    53→} from '@/components/ui/sheet';
+    54→import { Separator } from '@/components/ui/separator';
+    55→import { StatCard } from '@/components/ui/StatCard';
+    56→import { ProgressBar } from '@/components/ui/ProgressBar';
+    57→import {
+    58→  getExams,
+    59→  createExam,
+    60→  getReflections,
+    61→  type Exam,
+    62→  type ExamListResponse,
+    63→  type Reflection,
+    64→} from '@/lib/api';
+    65→import { useNavigationStore } from '@/store/navigation';
+    66→import { cn } from '@/lib/utils';
+    67→
+    68→// ─── Helpers ───────────────────────────────────────────────
+    69→const CATEGORY_BORDER: Record<string, string> = {
+    70→  Banking: 'border-l-emerald-500',
+    71→  SSC: 'border-l-amber-500',
+    72→  Railway: 'border-l-sky-500',
+    73→  Insurance: 'border-l-violet-500',
+    74→  Other: 'border-l-muted-foreground/30',
+    75→};
+    76→
+    77→function getCategoryBorder(category: string): string {
+    78→  return CATEGORY_BORDER[category] ?? 'border-l-muted-foreground/30';
+    79→}
+    80→
+    81→function formatDate(dateStr: string): string {
+    82→  const d = new Date(dateStr);
+    83→  return d.toLocaleDateString('en-IN', {
+    84→    day: 'numeric',
+    85→    month: 'short',
+    86→    year: 'numeric',
+    87→  });
+    88→}
+    89→
+    90→function groupExamsByYear(exams: Exam[]): Record<string, Exam[]> {
+    91→  const groups: Record<string, Exam[]> = {};
+    92→  for (const exam of exams) {
+    93→    const year = new Date(exam.examDate).getFullYear().toString();
+    94→    if (!groups[year]) groups[year] = [];
+    95→    groups[year].push(exam);
+    96→  }
+    97→  return Object.fromEntries(
+    98→    Object.entries(groups).sort(([a], [b]) => Number(b) - Number(a)),
+    99→  );
+   100→}
+   101→
+   102→// ─── Add Exam Dialog (same as dashboard) ───────────────────
+   103→function AddExamDialog({
+   104→  open,
+   105→  onOpenChange,
+   106→}: {
+   107→  open: boolean;
+   108→  onOpenChange: (open: boolean) => void;
+   109→}) {
+   110→  const queryClient = useQueryClient();
+   111→
+   112→  const [form, setForm] = useState({
+   113→    name: '',
+   114→    org: '',
+   115→    category: 'Banking',
+   116→    stage: 'Prelims',
+   117→    examDate: '',
+   118→    score: '',
+   119→    maxScore: '100',
+   120→    cutoff: '',
+   121→    result: 'Not Qualified',
+   122→    sections: [] as { section: string; score: string; max: string }[],
+   123→  });
+   124→
+   125→  const mutation = useMutation({
+   126→    mutationFn: () =>
+   127→      createExam({
+   128→        name: form.name,
+   129→        org: form.org || undefined,
+   130→        category: form.category,
+   131→        stage: form.stage,
+   132→        examDate: form.examDate,
+   133→        score: Number(form.score),
+   134→        maxScore: Number(form.maxScore),
+   135→        cutoff: Number(form.cutoff),
+   136→        result: form.result,
+   137→        sectionalScores: form.sections
+   138→          .filter((s) => s.section)
+   139→          .map((s) => ({
+   140→            section: s.section,
+   141→            score: Number(s.score),
+   142→            max: Number(s.max),
+   143→          })),
+   144→      }),
+   145→    onSuccess: () => {
+   146→      toast.success('Exam added successfully!');
+   147→      queryClient.invalidateQueries({ queryKey: ['exams'] });
+   148→      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+   149→      onOpenChange(false);
+   150→      setForm({
+   151→        name: '',
+   152→        org: '',
+   153→        category: 'Banking',
+   154→        stage: 'Prelims',
+   155→        examDate: '',
+   156→        score: '',
+   157→        maxScore: '100',
+   158→        cutoff: '',
+   159→        result: 'Not Qualified',
+   160→        sections: [],
+   161→      });
+   162→    },
+   163→    onError: () => {
+   164→      toast.error('Failed to add exam. Please try again.');
+   165→    },
+   166→  });
+   167→
+   168→  const addSection = () =>
+   169→    setForm((f) => [...f.sections, { section: '', score: '', max: '' }]);
+   170→
+   171→  const removeSection = (idx: number) =>
+   172→    setForm((f) => f.sections.filter((_, i) => i !== idx));
+   173→
+   174→  const updateSection = (
+   175→    idx: number,
+   176→    field: 'section' | 'score' | 'max',
+   177→    value: string,
+   178→  ) =>
+   179→    setForm((f) =>
+   180→      f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+   181→    );
+   182→
+   183→  return (
+   184→    <Dialog open={open} onOpenChange={onOpenChange}>
+   185→      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+   186→        <DialogHeader>
+   187→          <DialogTitle>Add Exam Result</DialogTitle>
+   188→        </DialogHeader>
+   189→        <div className="grid gap-4 py-2">
+   190→          <div className="grid gap-2">
+   191→            <Label htmlFor="hist-exam-name">Exam Name</Label>
+   192→            <Input
+   193→              id="hist-exam-name"
+   194→              placeholder="e.g. SBI PO 2025"
+   195→              value={form.name}
+   196→              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+   197→            />
+   198→          </div>
+   199→          <div className="grid grid-cols-2 gap-4">
+   200→            <div className="grid gap-2">
+   201→              <Label htmlFor="hist-exam-org">Organization</Label>
+   202→              <Input
+   203→                id="hist-exam-org"
+   204→                placeholder="e.g. SBI"
+   205→                value={form.org}
+   206→                onChange={(e) => setForm((f) => ({ ...f, org: e.target.value }))}
+   207→              />
+   208→            </div>
+   209→            <div className="grid gap-2">
+   210→              <Label>Category</Label>
+   211→              <Select
+   212→                value={form.category}
+   213→                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+   214→              >
+   215→                <SelectTrigger>
+   216→                  <SelectValue />
+   217→                </SelectTrigger>
+   218→                <SelectContent>
+   219→                  <SelectItem value="Banking">Banking</SelectItem>
+   220→                  <SelectItem value="SSC">SSC</SelectItem>
+   221→                  <SelectItem value="Railway">Railway</SelectItem>
+   222→                  <SelectItem value="Insurance">Insurance</SelectItem>
+   223→                  <SelectItem value="Other">Other</SelectItem>
+   224→                </SelectContent>
+   225→              </Select>
+   226→            </div>
+   227→          </div>
+   228→          <div className="grid grid-cols-2 gap-4">
+   229→            <div className="grid gap-2">
+   230→              <Label>Stage</Label>
+   231→              <Select
+   232→                value={form.stage}
+   233→                onValueChange={(v) => setForm((f) => ({ ...f, stage: v }))}
+   234→              >
+   235→                <SelectTrigger>
+   236→                  <SelectValue />
+   237→                </SelectTrigger>
+   238→                <SelectContent>
+   239→                  <SelectItem value="Prelims">Prelims</SelectItem>
+   240→                  <SelectItem value="Mains">Mains</SelectItem>
+   241→                  <SelectItem value="Interview">Interview</SelectItem>
+   242→                  <SelectItem value="Final">Final</SelectItem>
+   243→                </SelectContent>
+   244→              </Select>
+   245→            </div>
+   246→            <div className="grid gap-2">
+   247→              <Label htmlFor="hist-exam-date">Exam Date</Label>
+   248→              <Input
+   249→                id="hist-exam-date"
+   250→                type="date"
+   251→                value={form.examDate}
+   252→                onChange={(e) => setForm((f) => ({ ...f, examDate: e.target.value }))}
+   253→              />
+   254→            </div>
+   255→          </div>
+   256→          <div className="grid grid-cols-3 gap-4">
+   257→            <div className="grid gap-2">
+   258→              <Label htmlFor="hist-score">Score</Label>
+   259→              <Input
+   260→                id="hist-score"
+   261→                type="number"
+   262→                placeholder="0"
+   263→                value={form.score}
+   264→                onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))}
+   265→              />
+   266→            </div>
+   267→            <div className="grid gap-2">
+   268→              <Label htmlFor="hist-max">Max Score</Label>
+   269→              <Input
+   270→                id="hist-max"
+   271→                type="number"
+   272→                placeholder="100"
+   273→                value={form.maxScore}
+   274→                onChange={(e) => setForm((f) => ({ ...f, maxScore: e.target.value }))}
+   275→              />
+   276→            </div>
+   277→            <div className="grid gap-2">
+   278→              <Label htmlFor="hist-cutoff">Cutoff</Label>
+   279→              <Input
+   280→                id="hist-cutoff"
+   281→                type="number"
+   282→                placeholder="0"
+   283→                value={form.cutoff}
+   284→                onChange={(e) => setForm((f) => ({ ...f, cutoff: e.target.value }))}
+   285→              />
+   286→            </div>
+   287→          </div>
+   288→          <div className="grid gap-2">
+   289→            <Label>Result</Label>
+   290→            <Select
+   291→              value={form.result}
+   292→              onValueChange={(v) => setForm((f) => ({ ...f, result: v }))}
+   293→            >
+   294→              <SelectTrigger>
+   295→                <SelectValue />
+   296→              </SelectTrigger>
+   297→              <SelectContent>
+   298→                <SelectItem value="Qualified">Qualified</SelectItem>
+   299→                <SelectItem value="Not Qualified">Not Qualified</SelectItem>
+   300→                <SelectItem value="Awaited">Result Awaited</SelectItem>
+   301→              </SelectContent>
+   302→            </Select>
+   303→          </div>
+   304→          <div className="grid gap-3">
+   305→            <div className="flex items-center justify-between">
+   306→              <Label>Sectional Scores (optional)</Label>
+   307→              <Button variant="outline" size="sm" type="button" onClick={addSection}>
+   308→                <Plus className="mr-1 size-3.5" />
+   309→                Add Section
+   310→              </Button>
+   311→            </div>
+   312→            {form.sections.map((sec, idx) => (
+   313→              <div key={idx} className="grid grid-cols-[1fr_80px_80px_auto] gap-2">
+   314→                <Input
+   315→                  placeholder="Section name"
+   316→                  value={sec.section}
+   317→                  onChange={(e) => updateSection(idx, 'section', e.target.value)}
+   318→                />
+   319→                <Input
+   320→                  type="number"
+   321→                  placeholder="Score"
+   322→                  value={sec.score}
+   323→                  onChange={(e) => updateSection(idx, 'score', e.target.value)}
+   324→                />
+   325→                <Input
+   326→                  type="number"
+   327→                  placeholder="Max"
+   328→                  value={sec.max}
+   329→                  onChange={(e) => updateSection(idx, 'max', e.target.value)}
+   330→                />
+   331→                <Button variant="ghost" size="icon" onClick={() => removeSection(idx)}>
+   332→                  <X className="size-4 text-muted-foreground" />
+   333→                </Button>
+   334→              </div>
+   335→            ))}
+   336→          </div>
+   337→        </div>
+   338→        <DialogFooter>
+   339→          <DialogClose asChild>
+   340→            <Button variant="outline">Cancel</Button>
+   341→          </DialogClose>
+   342→          <Button
+   343→            onClick={() => mutation.mutate()}
+   344→            disabled={mutation.isPending || !form.name || !form.examDate || !form.score}
+   345→          >
+   346→            {mutation.isPending ? 'Saving...' : 'Add Exam'}
+   347→          </Button>
+   348→        </DialogFooter>
+   349→      </DialogContent>
+   350→    </Dialog>
+   351→  );
+   352→}
+   353→
+   354→// ─── Exam Detail Panel Content ─────────────────────────────
+   355→function ExamDetailContent({
+   356→  exam,
+   357→  activeTab,
+   358→}: {
+   359→  exam: Exam;
+   360→  activeTab: string;
+   361→}) {
+   362→  const { data: reflections } = useQuery<Reflection[]>({
+   363→    queryKey: ['reflections', exam.id],
+   364→    queryFn: () => getReflections({ examId: exam.id }),
+   365→  });
+   366→
+   367→  const reflection = reflections?.[0] ?? null;
+   368→  const scorePercent = exam.maxScore > 0
+   369→    ? Math.round((exam.score / exam.maxScore) * 100)
+   370→    : 0;
+   371→
+   372→  return (
+   373→    <div className="space-y-5">
+   374→      {/* Overview Tab */}
+   375→      {activeTab === 'overview' && (
+   376→        <>
+   377→          <div className="grid grid-cols-2 gap-4">
+   378→            <div className="space-y-1 rounded-lg border p-3">
+   379→              <p className="text-xs text-muted-foreground">Category</p>
+   380→              <Badge variant="outline">{exam.category}</Badge>
+   381→            </div>
+   382→            <div className="space-y-1 rounded-lg border p-3">
+   383→              <p className="text-xs text-muted-foreground">Stage</p>
+   384→              <Badge variant="outline">{exam.stage}</Badge>
+   385→            </div>
+   386→            <div className="space-y-1 rounded-lg border p-3">
+   387→              <p className="text-xs text-muted-foreground">Organization</p>
+   388→              <p className="text-sm font-medium">{exam.org || '—'}</p>
+   389→            </div>
+   390→            <div className="space-y-1 rounded-lg border p-3">
+   391→              <p className="text-xs text-muted-foreground">Attempt</p>
+   392→              <p className="text-sm font-medium">#{exam.attempt}</p>
+   393→            </div>
+   394→          </div>
+   395→
+   396→          <Separator className="my-1" />
+   397→
+   398→          {/* Score */}
+   399→          <div className="space-y-3 rounded-lg border p-4">
+   400→            <div className="flex items-center justify-between text-sm">
+   401→              <span className="text-muted-foreground">Overall Score</span>
+   402→              <span className="font-bold">{exam.score}/{exam.maxScore} ({scorePercent}%)</span>
+   403→            </div>
+   404→            <ProgressBar
+   405→              percent={scorePercent}
+   406→              color="bg-emerald-600 dark:bg-emerald-500"
+   407→              height="h-3"
+   408→            />
+   409→          </div>
+   410→
+   411→          <div className="grid grid-cols-2 gap-3">
+   412→            <div className="rounded-lg border p-3 text-center">
+   413→              <p className="text-xs text-muted-foreground">Cutoff</p>
+   414→              <p className="text-lg font-bold">{exam.cutoff}</p>
+   415→            </div>
+   416→            <div className="rounded-lg border p-3 text-center">
+   417→              <p className="text-xs text-muted-foreground">Gap</p>
+   418→              <p className={`text-lg font-bold ${exam.cutoffGap !== null && exam.cutoffGap >= 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+   419→                {exam.cutoffGap !== null ? exam.cutoffGap : '—'}
+   420→              </p>
+   421→            </div>
+   422→          </div>
+   423→
+   424→          <Separator className="my-1" />
+   425→
+   426→          {/* Sectional Scores */}
+   427→          {exam.sectionalScores.length > 0 && (
+   428→            <div className="space-y-3">
+   429→              <h4 className="text-sm font-semibold">Sectional Scores</h4>
+   430→              {exam.sectionalScores.map((sec) => {
+   431→                const pct = sec.max > 0
+   432→                  ? Math.round((sec.score / sec.max) * 100)
+   433→                  : 0;
+   434→                return (
+   435→                  <div key={sec.id} className="space-y-1.5">
+   436→                    <div className="flex items-center justify-between text-sm">
+   437→                      <span className="font-medium">{sec.section}</span>
+   438→                      <span className="text-muted-foreground">
+   439→                        {sec.score}/{sec.max} ({pct}%)
+   440→                      </span>
+   441→                    </div>
+   442→                    <ProgressBar
+   443→                      percent={pct}
+   444→                      color={
+   445→                        pct >= 60
+   446→                          ? 'bg-emerald-600 dark:bg-emerald-500'
+   447→                          : pct >= 40
+   448→                            ? 'bg-amber-500 dark:bg-amber-400'
+   449→                            : 'bg-red-500 dark:bg-red-400'
+   450→                      }
+   451→                      height="h-2"
+   452→                    />
+   453→                  </div>
+   454→                );
+   455→              })}
+   456→            </div>
+   457→          )}
+   458→
+   459→          {exam.rank !== null && (
+   460→            <div className="rounded-lg border p-3 text-center">
+   461→              <p className="text-xs text-muted-foreground">Rank</p>
+   462→              <p className="text-lg font-bold">{exam.rank}</p>
+   463→            </div>
+   464→          )}
+   465→        </>
+   466→      )}
+   467→
+   468→      {/* Reflection Tab */}
+   469→      {activeTab === 'reflection' && (
+   470→        <>
+   471→          {reflection ? (
+   472→            <div className="space-y-4">
+   473→              <div className="flex items-center gap-2">
+   474→                <FileText className="size-4 text-emerald-600 dark:text-emerald-400" />
+   475→                <span className="text-sm font-semibold">Reflection exists</span>
+   476→              </div>
+   477→
+   478→              <div className="space-y-3">
+   479→                {reflection.whatWentWell && (
+   480→                  <div className="space-y-1">
+   481→                    <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+   482→                      What went well
+   483→                    </p>
+   484→                    <p className="text-sm text-foreground">{reflection.whatWentWell}</p>
+   485→                  </div>
+   486→                )}
+   487→                {reflection.whatWentWrong && (
+   488→                  <div className="space-y-1">
+   489→                    <p className="text-xs font-medium text-red-600 dark:text-red-400">
+   490→                      What went wrong
+   491→                    </p>
+   492→                    <p className="text-sm text-foreground">{reflection.whatWentWrong}</p>
+   493→                  </div>
+   494→                )}
+   495→                {reflection.biggestLesson && (
+   496→                  <div className="space-y-1">
+   497→                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+   498→                      Biggest lesson
+   499→                    </p>
+   500→                    <p className="text-sm text-foreground">{reflection.biggestLesson}</p>
+   501→                  </div>
+   502→                )}
+   503→                {reflection.actionPlan && (
+   504→                  <div className="space-y-1">
+   505→                    <p className="text-xs font-medium text-teal-600 dark:text-teal-400">
+   506→                      Action plan
+   507→                    </p>
+   508→                    <p className="text-sm text-foreground">{reflection.actionPlan}</p>
+   509→                  </div>
+   510→                )}
+   511→                {reflection.difficulty && (
+   512→                  <div className="space-y-1">
+   513→                    <p className="text-xs font-medium text-muted-foreground">Difficulty</p>
+   514→                    <p className="text-sm">{reflection.difficulty}</p>
+   515→                  </div>
+   516→                )}
+   517→                {reflection.confidence !== null && (
+   518→                  <div className="space-y-1">
+   519→                    <p className="text-xs font-medium text-muted-foreground">Confidence</p>
+   520→                    <ProgressBar
+   521→                      percent={reflection.confidence}
+   522→                      color="bg-teal-600 dark:bg-teal-500"
+   523→                      height="h-2"
+   524→                      showValue
+   525→                    />
+   526→                  </div>
+   527→                )}
+   528→                {reflection.sections.length > 0 && (
+   529→                  <div className="space-y-2">
+   530→                    <p className="text-xs font-semibold text-muted-foreground">Section Analysis</p>
+   531→                    {reflection.sections.map((sec) => (
+   532→                      <div key={sec.id} className="rounded-lg border p-2.5 space-y-1">
+   533→                        <div className="flex items-center justify-between">
+   534→                          <span className="text-sm font-medium">{sec.section}</span>
+   535→                          {sec.score !== null && (
+   536→                            <span className="text-xs text-muted-foreground">{sec.score}%</span>
+   537→                          )}
+   538→                        </div>
+   539→                        {sec.strength && (
+   540→                          <p className="text-xs text-emerald-600 dark:text-emerald-400">
+   541→                            ✅ {sec.strength}
+   542→                          </p>
+   543→                        )}
+   544→                        {sec.weakness && (
+   545→                          <p className="text-xs text-red-600 dark:text-red-400">
+   546→                            ❌ {sec.weakness}
+   547→                          </p>
+   548→                        )}
+   549→                        {sec.actionPlan && (
+   550→                          <p className="text-xs text-muted-foreground">
+   551→                            📋 {sec.actionPlan}
+   552→                          </p>
+   553→                        )}
+   554→                      </div>
+   555→                    ))}
+   556→                  </div>
+   557→                )}
+   558→              </div>
+   559→            </div>
+   560→          ) : (
+   561→            <div className="flex flex-col items-center justify-center py-8 text-center">
+   562→              <BookOpen className="mb-3 size-10 text-muted-foreground/40" />
+   563→              <p className="text-sm font-medium text-muted-foreground">
+   564→                No reflection yet
+   565→              </p>
+   566→              <p className="mt-1 text-xs text-muted-foreground/60">
+   567→                Add a reflection to analyze your performance.
+   568→              </p>
+   569→            </div>
+   570→          )}
+   571→        </>
+   572→      )}
+   573→    </div>
+   574→  );
+   575→}
+   576→
+   577→// ─── Exam History Page ─────────────────────────────────────
+   578→export default function ExamHistoryPage() {
+   579→  const navigate = useNavigationStore((s) => s.navigate);
+   580→  const queryClient = useQueryClient();
+   581→
+   582→  const [category, setCategory] = useState('all');
+   583→  const [year, setYear] = useState('all');
+   584→  const [status, setStatus] = useState('all');
+   585→  const [sort, setSort] = useState('examDate:desc');
+   586→  const [page, setPage] = useState(1);
+   587→  const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
+   588→  const [detailTab, setDetailTab] = useState('overview');
+   589→  const [addExamOpen, setAddExamOpen] = useState(false);
+   590→  const [sheetOpen, setSheetOpen] = useState(false);
+   591→
+   592→  const { data, isLoading, isFetching } = useQuery<ExamListResponse>({
+   593→    queryKey: ['exams', category, year, status, sort, page],
+   594→    queryFn: () =>
+   595→      getExams({
+   596→        page,
+   597→        limit: 12,
+   598→        sort,
+   599→        category: category !== 'all' ? category : undefined,
+   600→        year: year !== 'all' ? year : undefined,
+   601→        status: status !== 'all' ? status : undefined,
+   602→      }),
+   603→  });
+   604→
+   605→  const exams = data?.data ?? [];
+   606→  const pagination = data?.pagination;
+   607→  const hasMore = pagination ? page < pagination.pages : false;
+   608→
+   609→  const grouped = useMemo(() => groupExamsByYear(exams), [exams]);
+   610→
+   611→  // Stats computed from all loaded exams
+   612→  const stats = useMemo(() => {
+   613→    const total = exams.length;
+   614→    const qualified = exams.filter((e) => e.result === 'Qualified').length;
+   615→    const avgScore =
+   616→      total > 0
+   617→        ? Math.round(
+   618→            (exams.reduce(
+   619→              (s, e) => s + (e.score / e.maxScore) * 100,
+   620→              0,
+   621→            ) /
+   622→              total) *
+   623→              10,
+   624→          ) / 10
+   625→        : 0;
+   626→    const bestScore =
+   627→      total > 0
+   628→        ? Math.round(
+   629→            (Math.max(...exams.map((e) => e.score / e.maxScore)) * 100) * 10,
+   630→          ) / 10
+   631→        : 0;
+   632→    return { total, qualified, avgScore, bestScore };
+   633→  }, [exams]);
+   634→
+   635→  const selectedExam = useMemo(
+   636→    () => exams.find((e) => e.id === selectedExamId) ?? null,
+   637→    [exams, selectedExamId],
+   638→  );
+   639→
+   640→  const openDetail = (examId: string) => {
+   641→    setSelectedExamId(examId);
+   642→    setDetailTab('overview');
+   643→    setSheetOpen(true);
+   644→  };
+   645→
+   646→  return (
+   647→    <div className="space-y-6">
+   648→      {/* Header */}
+   649→      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   650→        <div>
+   651→          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+   652→            Exam History
+   653→          </h1>
+   654→          <p className="text-sm text-muted-foreground">
+   655→            Browse and manage all your past exam results
+   656→          </p>
+   657→        </div>
+   658→        <Button
+   659→          onClick={() => setAddExamOpen(true)}
+   660→          className="bg-emerald-600 text-white hover:bg-emerald-700"
+   661→        >
+   662→          <Plus className="mr-2 size-4" />
+   663→          Add Exam
+   664→        </Button>
+   665→      </div>
+   666→
+   667→      {/* Stat Cards */}
+   668→      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+   669→        <StatCard
+   670→          icon={GraduationCap}
+   671→          label="Total Exams"
+   672→          value={stats.total}
+   673→          colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+   674→        />
+   675→        <StatCard
+   676→          icon={Trophy}
+   677→          label="Qualified"
+   678→          value={stats.qualified}
+   679→          change={
+   680→            stats.total > 0
+   681→              ? `${Math.round((stats.qualified / stats.total) * 100)}% rate`
+   682→              : undefined
+   683→          }
+   684→          trend={stats.qualified >= stats.total * 0.5 ? 'up' : 'neutral'}
+   685→        />
+   686→        <StatCard
+   687→          icon={BarChart3}
+   688→          label="Avg Score"
+   689→          value={`${stats.avgScore}%`}
+   690→          colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300"
+   691→        />
+   692→        <StatCard
+   693→          icon={Star}
+   694→          label="Best Score"
+   695→          value={`${stats.bestScore}%`}
+   696→          trend="up"
+   697→          colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+   698→        />
+   699→      </div>
+   700→
+   701→      {/* Filter Bar */}
+   702→      <Card>
+   703→        <CardContent className="flex flex-wrap items-center gap-3 py-3">
+   704→          <Filter className="size-4 text-muted-foreground" />
+   705→          <Select value={category} onValueChange={(v) => { setCategory(v); setPage(1); }}>
+   706→            <SelectTrigger className="w-[130px]">
+   707→              <SelectValue placeholder="Category" />
+   708→            </SelectTrigger>
+   709→            <SelectContent>
+   710→              <SelectItem value="all">All Categories</SelectItem>
+   711→              <SelectItem value="Banking">Banking</SelectItem>
+   712→              <SelectItem value="SSC">SSC</SelectItem>
+   713→              <SelectItem value="Railway">Railway</SelectItem>
+   714→              <SelectItem value="Insurance">Insurance</SelectItem>
+   715→              <SelectItem value="Other">Other</SelectItem>
+   716→            </SelectContent>
+   717→          </Select>
+   718→          <Select value={year} onValueChange={(v) => { setYear(v); setPage(1); }}>
+   719→            <SelectTrigger className="w-[100px]">
+   720→              <SelectValue placeholder="Year" />
+   721→            </SelectTrigger>
+   722→            <SelectContent>
+   723→              <SelectItem value="all">All Years</SelectItem>
+   724→              <SelectItem value="2025">2025</SelectItem>
+   725→              <SelectItem value="2024">2024</SelectItem>
+   726→              <SelectItem value="2023">2023</SelectItem>
+   727→            </SelectContent>
+   728→          </Select>
+   729→          <Select value={status} onValueChange={(v) => { setStatus(v); setPage(1); }}>
+   730→            <SelectTrigger className="w-[140px]">
+   731→              <SelectValue placeholder="Status" />
+   732→            </SelectTrigger>
+   733→            <SelectContent>
+   734→              <SelectItem value="all">All Status</SelectItem>
+   735→              <SelectItem value="Qualified">Qualified</SelectItem>
+   736→              <SelectItem value="Not Qualified">Not Qualified</SelectItem>
+   737→              <SelectItem value="Awaited">Result Awaited</SelectItem>
+   738→            </SelectContent>
+   739→          </Select>
+   740→          <Select value={sort} onValueChange={setSort}>
+   741→            <SelectTrigger className="w-[160px]">
+   742→              <SelectValue placeholder="Sort" />
+   743→            </SelectTrigger>
+   744→            <SelectContent>
+   745→              <SelectItem value="examDate:desc">Newest First</SelectItem>
+   746→              <SelectItem value="examDate:asc">Oldest First</SelectItem>
+   747→              <SelectItem value="score:desc">Highest Score</SelectItem>
+   748→              <SelectItem value="score:asc">Lowest Score</SelectItem>
+   749→            </SelectContent>
+   750→          </Select>
+   751→        </CardContent>
+   752→      </Card>
+   753→
+   754→      {/* Exam Cards */}
+   755→      <div className="space-y-8">
+   756→        {isLoading ? (
+   757→          <div className="space-y-6">
+   758→            <Skeleton className="h-8 w-24" />
+   759→            {Array.from({ length: 3 }).map((_, i) => (
+   760→              <Skeleton key={i} className="h-[120px] w-full rounded-xl" />
+   761→            ))}
+   762→          </div>
+   763→        ) : Object.keys(grouped).length > 0 ? (
+   764→          Object.entries(grouped).map(([yearLabel, yearExams]) => (
+   765→            <div key={yearLabel}>
+   766→              <h2 className="mb-3 text-lg font-semibold text-foreground">
+   767→                {yearLabel}
+   768→              </h2>
+   769→              <div className="space-y-3">
+   770→                {yearExams.map((exam) => {
+   771→                  const gap = exam.cutoffGap;
+   772→                  const gapColor =
+   773→                    gap !== null && gap > 0
+   774→                      ? 'text-red-600 dark:text-red-400'
+   775→                      : gap !== null && gap <= 0
+   776→                        ? 'text-emerald-600 dark:text-emerald-400'
+   777→                        : 'text-muted-foreground';
+   778→
+   779→                  return (
+   780→                    <Card
+   781→                      key={exam.id}
+   782→                      className={cn(
+   783→                        'cursor-pointer border-l-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:shadow-lg/10',
+   784→                        getCategoryBorder(exam.category),
+   785→                      )}
+   786→                      onClick={() => openDetail(exam.id)}
+   787→                    >
+   788→                      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+   789→                        {/* Left info */}
+   790→                        <div className="flex items-start gap-3">
+   791→                          <div className="flex flex-col items-center gap-1">
+   792→                            <Badge variant="outline" className="text-xs">
+   793→                              {exam.category}
+   794→                            </Badge>
+   795→                            <Badge
+   796→                              variant="secondary"
+   797→                              className="text-[10px]"
+   798→                            >
+   799→                              {exam.stage}
+   800→                            </Badge>
+   801→                          </div>
+   802→                          <div>
+   803→                            <p className="font-semibold text-foreground">
+   804→                              {exam.name}
+   805→                            </p>
+   806→                            <p className="text-xs text-muted-foreground">
+   807→                              {exam.org || 'Unknown'} ·{' '}
+   808→                              {formatDate(exam.examDate)} · Attempt #
+   809→                              {exam.attempt}
+   810→                            </p>
+   811→                          </div>
+   812→                        </div>
+   813→
+   814→                        {/* Right stats */}
+   815→                        <div className="flex items-center gap-4">
+   816→                          <div className="text-right">
+   817→                            <p className="text-lg font-bold">{exam.score}/{exam.maxScore}</p>
+   818→                            <p className="text-xs text-muted-foreground">
+   819→                              Cutoff: {exam.cutoff}
+   820→                            </p>
+   821→                          </div>
+   822→                          <div className="text-right">
+   823→                            <p className={`text-sm font-semibold ${gapColor}`}>
+   824→                              {gap !== null ? (gap > 0 ? `+${gap}` : `${gap}`) : '—'}
+   825→                            </p>
+   826→                            <p className="text-[10px] text-muted-foreground">gap</p>
+   827→                          </div>
+   828→                          <Badge
+   829→                            className={
+   830→                              exam.result === 'Qualified'
+   831→                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+   832→                                : exam.result === 'Awaited'
+   833→                                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+   834→                                  : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+   835→                            }
+   836→                          >
+   837→                            {exam.result}
+   838→                          </Badge>
+   839→                          {exam.reflection && (
+   840→                            <BookOpen className="size-4 text-emerald-600 dark:text-emerald-400" />
+   841→                          )}
+   842→                          <Eye className="size-4 text-muted-foreground" />
+   843→                        </div>
+   844→                      </CardContent>
+   845→                    </Card>
+   846→                  );
+   847→                })}
+   848→              </div>
+   849→            </div>
+   850→          ))
+   851→        ) : (
+   852→          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+   853→            <SearchX className="mb-4 size-12 text-muted-foreground/30" />
+   854→            <p className="text-lg font-medium text-muted-foreground">
+   855→              No exams found
+   856→            </p>
+   857→            <p className="mt-1 text-sm text-muted-foreground/60">
+   858→              Try adjusting your filters or add your first exam.
+   859→            </p>
+   860→            <Button
+   861→              variant="outline"
+   862→              className="mt-6 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+   863→              onClick={() => setAddExamOpen(true)}
+   864→            >
+   865→              <Plus className="size-4" />
+   866→              Add Your First Exam
+   867→            </Button>
+   868→          </div>
+   869→        )}
+   870→      </div>
+   871→
+   872→      {/* Load More */}
+   873→      {hasMore && (
+   874→        <div className="flex justify-center">
+   875→          <Button
+   876→            variant="outline"
+   877→            onClick={() => setPage((p) => p + 1)}
+   878→            disabled={isFetching}
+   879→          >
+   880→            {isFetching ? (
+   881→              <Loader2 className="mr-2 size-4 animate-spin" />
+   882→            ) : null}
+   883→            Load More
+   884→          </Button>
+   885→        </div>
+   886→      )}
+   887→
+   888→      {/* Detail Side Sheet (Mobile) */}
+   889→      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+   890→        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+   891→          {selectedExam && (
+   892→            <>
+   893→              <SheetHeader>
+   894→                <SheetTitle className="text-lg">{selectedExam.name}</SheetTitle>
+   895→              </SheetHeader>
+   896→              <Tabs value={detailTab} onValueChange={setDetailTab} className="mt-4">
+   897→                <TabsList className="grid w-full grid-cols-2">
+   898→                  <TabsTrigger value="overview">Overview</TabsTrigger>
+   899→                  <TabsTrigger value="reflection">Reflection</TabsTrigger>
+   900→                </TabsList>
+   901→                <TabsContent value="overview">
+   902→                  <ExamDetailContent exam={selectedExam} activeTab="overview" />
+   903→                </TabsContent>
+   904→                <TabsContent value="reflection">
+   905→                  <ExamDetailContent exam={selectedExam} activeTab="reflection" />
+   906→                </TabsContent>
+   907→              </Tabs>
+   908→            </>
+   909→          )}
+   910→        </SheetContent>
+   911→      </Sheet>
+   912→
+   913→      {/* Add Exam Dialog */}
+   914→      <AddExamDialog open={addExamOpen} onOpenChange={setAddExamOpen} />
+   915→    </div>
+   916→  );
+   917→}
+   918→
