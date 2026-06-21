@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { formatDistanceToNow } from 'date-fns';
 import {
   Menu,
   Search,
@@ -9,12 +11,19 @@ import {
   Bell,
   User,
   LogOut,
+  Info,
+  CheckCircle,
+  AlertTriangle,
+  XCircle,
+  Loader2,
+  CheckCheck,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +34,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -33,8 +47,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -42,8 +54,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useNavigationStore, type PageId } from '@/store/navigation';
 import { useUserStore } from '@/store/user-store';
+import {
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  createExam,
+  type Notification,
+} from '@/lib/api';
 import { toast } from 'sonner';
 
 const PAGE_META: Record<
@@ -122,6 +142,12 @@ const PAGE_META: Record<
     showSearch: true,
     showAdd: false,
   },
+  'sign-out': {
+    title: 'Sign Out',
+    subtitle: 'Manage your active sessions',
+    showSearch: false,
+    showAdd: false,
+  },
   upgrade: {
     title: 'Upgrade to Pro',
     subtitle: 'Unlock premium features',
@@ -130,11 +156,40 @@ const PAGE_META: Record<
   },
 };
 
+const NOTIFICATION_ICON_MAP: Record<string, React.ElementType> = {
+  info: Info,
+  success: CheckCircle,
+  warning: AlertTriangle,
+  error: XCircle,
+};
+
+const NOTIFICATION_ICON_COLOR: Record<string, string> = {
+  info: 'text-emerald-600 dark:text-emerald-400',
+  success: 'text-emerald-600 dark:text-emerald-400',
+  warning: 'text-amber-600 dark:text-amber-400',
+  error: 'text-red-600 dark:text-red-400',
+};
+
 export function Topbar() {
   const { currentPage, navigate, setSidebarOpen } = useNavigationStore();
-  const { profile, notificationsCount, clearNotifications } = useUserStore();
+  const { profile, setNotificationsCount, clearNotifications } = useUserStore();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+
+  // Add Exam form state
+  const [examForm, setExamForm] = useState({
+    name: '',
+    org: '',
+    category: 'Banking',
+    stage: 'Prelims',
+    examDate: '',
+    score: '',
+    maxScore: '100',
+    cutoff: '',
+    result: 'Pending',
+  });
 
   const meta = PAGE_META[currentPage] ?? {
     title: 'Exam Journey Tracker',
@@ -150,11 +205,80 @@ export function Topbar() {
     [navigate],
   );
 
-  const handleAddExam = useCallback(() => {
-    // Form submission would go here
-    setDialogOpen(false);
-    toast.success('Exam added successfully!');
-  }, []);
+  // ─── Notifications ─────────────────────────────────────────
+  const { data: notifications = [], isLoading: notifLoading } = useQuery<Notification[]>({
+    queryKey: ['notifications'],
+    queryFn: getNotifications,
+    staleTime: 30_000,
+  });
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+
+  const markReadMutation = useMutation({
+    mutationFn: markNotificationRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-count'] });
+    },
+  });
+
+  const markAllReadMutation = useMutation({
+    mutationFn: markAllNotificationsRead,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications-count'] });
+      setNotificationsCount(0);
+      clearNotifications();
+      toast.success('All notifications marked as read');
+    },
+    onError: () => {
+      toast.error('Failed to mark all as read');
+    },
+  });
+
+  // ─── Add Exam ──────────────────────────────────────────────
+  const examMutation = useMutation({
+    mutationFn: () =>
+      createExam({
+        name: examForm.name,
+        org: examForm.org || undefined,
+        category: examForm.category,
+        stage: examForm.stage,
+        examDate: examForm.examDate,
+        score: Number(examForm.score),
+        maxScore: Number(examForm.maxScore),
+        cutoff: Number(examForm.cutoff),
+        result: examForm.result,
+      }),
+    onSuccess: () => {
+      toast.success('Exam added successfully!');
+      queryClient.invalidateQueries({ queryKey: ['exams'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      setDialogOpen(false);
+      setExamForm({
+        name: '',
+        org: '',
+        category: 'Banking',
+        stage: 'Prelims',
+        examDate: '',
+        score: '',
+        maxScore: '100',
+        cutoff: '',
+        result: 'Pending',
+      });
+    },
+    onError: () => {
+      toast.error('Failed to add exam. Please try again.');
+    },
+  });
+
+  const handleExamSubmit = useCallback(() => {
+    if (!examForm.name || !examForm.examDate || !examForm.score) {
+      toast.error('Please fill in exam name, date, and score');
+      return;
+    }
+    examMutation.mutate();
+  }, [examForm, examMutation]);
 
   const initials = profile?.name
     ? profile.name
@@ -219,58 +343,148 @@ export function Topbar() {
               <span className="hidden sm:inline">Add Exam</span>
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
             <DialogHeader>
               <DialogTitle>Add New Exam</DialogTitle>
               <DialogDescription>
                 Record a new exam result to track your progress.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-4 py-2">
               <div className="grid gap-2">
-                <Label htmlFor="exam-name">Exam Name</Label>
-                <Input id="exam-name" placeholder="e.g. Midterm Calculus" />
+                <Label htmlFor="tb-exam-name">Exam Name</Label>
+                <Input
+                  id="tb-exam-name"
+                  placeholder="e.g. IBPS PO 2025"
+                  value={examForm.name}
+                  onChange={(e) =>
+                    setExamForm((f) => ({ ...f, name: e.target.value }))
+                  }
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="exam-subject">Subject</Label>
-                  <Select>
-                    <SelectTrigger id="exam-subject">
-                      <SelectValue placeholder="Select subject" />
+                  <Label htmlFor="tb-exam-org">Organization</Label>
+                  <Input
+                    id="tb-exam-org"
+                    placeholder="e.g. IBPS, SSC"
+                    value={examForm.org}
+                    onChange={(e) =>
+                      setExamForm((f) => ({ ...f, org: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Category</Label>
+                  <Select
+                    value={examForm.category}
+                    onValueChange={(v) =>
+                      setExamForm((f) => ({ ...f, category: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="math">Mathematics</SelectItem>
-                      <SelectItem value="physics">Physics</SelectItem>
-                      <SelectItem value="chemistry">Chemistry</SelectItem>
-                      <SelectItem value="biology">Biology</SelectItem>
-                      <SelectItem value="english">English</SelectItem>
-                      <SelectItem value="history">History</SelectItem>
-                      <SelectItem value="cs">Computer Science</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
+                      <SelectItem value="Banking">Banking</SelectItem>
+                      <SelectItem value="SSC">SSC</SelectItem>
+                      <SelectItem value="Railway">Railway</SelectItem>
+                      <SelectItem value="UPSC">UPSC</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label>Stage</Label>
+                  <Select
+                    value={examForm.stage}
+                    onValueChange={(v) =>
+                      setExamForm((f) => ({ ...f, stage: v }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Prelims">Prelims</SelectItem>
+                      <SelectItem value="Mains">Mains</SelectItem>
+                      <SelectItem value="Tier 1">Tier 1</SelectItem>
+                      <SelectItem value="Tier 2">Tier 2</SelectItem>
+                      <SelectItem value="Interview">Interview</SelectItem>
+                      <SelectItem value="CBT 1">CBT 1</SelectItem>
+                      <SelectItem value="Final">Final</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="exam-date">Date</Label>
-                  <Input id="exam-date" type="date" />
+                  <Label htmlFor="tb-exam-date">Exam Date</Label>
+                  <Input
+                    id="tb-exam-date"
+                    type="date"
+                    value={examForm.examDate}
+                    onChange={(e) =>
+                      setExamForm((f) => ({ ...f, examDate: e.target.value }))
+                    }
+                  />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="exam-score">Score</Label>
-                  <Input id="exam-score" type="number" placeholder="85" />
+                  <Label htmlFor="tb-score">Score</Label>
+                  <Input
+                    id="tb-score"
+                    type="number"
+                    placeholder="0"
+                    value={examForm.score}
+                    onChange={(e) =>
+                      setExamForm((f) => ({ ...f, score: e.target.value }))
+                    }
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="exam-max">Max Score</Label>
-                  <Input id="exam-max" type="number" placeholder="100" />
+                  <Label htmlFor="tb-max-score">Max Score</Label>
+                  <Input
+                    id="tb-max-score"
+                    type="number"
+                    placeholder="100"
+                    value={examForm.maxScore}
+                    onChange={(e) =>
+                      setExamForm((f) => ({ ...f, maxScore: e.target.value }))
+                    }
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="tb-cutoff">Cutoff</Label>
+                  <Input
+                    id="tb-cutoff"
+                    type="number"
+                    placeholder="0"
+                    value={examForm.cutoff}
+                    onChange={(e) =>
+                      setExamForm((f) => ({ ...f, cutoff: e.target.value }))
+                    }
+                  />
                 </div>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="exam-notes">Notes (optional)</Label>
-                <Textarea
-                  id="exam-notes"
-                  placeholder="How did the exam go? Any thoughts..."
-                />
+                <Label>Result</Label>
+                <Select
+                  value={examForm.result}
+                  onValueChange={(v) =>
+                    setExamForm((f) => ({ ...f, result: v }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Qualified">Qualified</SelectItem>
+                    <SelectItem value="Not Qualified">Not Qualified</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <DialogFooter>
@@ -279,9 +493,17 @@ export function Topbar() {
               </Button>
               <Button
                 className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-600 text-white"
-                onClick={handleAddExam}
+                onClick={handleExamSubmit}
+                disabled={examMutation.isPending}
               >
-                Save Exam
+                {examMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  'Save Exam'
+                )}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -300,21 +522,132 @@ export function Topbar() {
           <Settings className="size-[18px]" />
         </Button>
 
-        {/* Notifications */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative"
-          onClick={() => handleNav('help')}
-          aria-label={`Notifications${notificationsCount > 0 ? ` (${notificationsCount} unread)` : ''}`}
-        >
-          <Bell className="size-[18px]" />
-          {notificationsCount > 0 && (
-            <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
-              {notificationsCount > 9 ? '9+' : notificationsCount}
-            </span>
-          )}
-        </Button>
+        {/* Notification Dropdown */}
+        <Popover open={notifOpen} onOpenChange={setNotifOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="relative"
+              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+            >
+              <Bell className="size-[18px]" />
+              {unreadCount > 0 && (
+                <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-80 p-0"
+            align="end"
+            sideOffset={8}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3">
+              <h3 className="text-sm font-semibold text-foreground">
+                Notifications
+              </h3>
+              {unreadCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                  onClick={() => markAllReadMutation.mutate()}
+                  disabled={markAllReadMutation.isPending}
+                >
+                  {markAllReadMutation.isPending ? (
+                    <Loader2 className="mr-1 size-3 animate-spin" />
+                  ) : (
+                    <CheckCheck className="mr-1 size-3" />
+                  )}
+                  Mark all read
+                </Button>
+              )}
+            </div>
+            <Separator />
+
+            {/* Notification List */}
+            <div className="max-h-[400px] overflow-y-auto">
+              {notifLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <Bell className="mb-2 size-8 text-muted-foreground/40" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    No new notifications
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground/60">
+                    You&apos;re all caught up!
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {notifications.map((notif) => {
+                    const IconComponent =
+                      NOTIFICATION_ICON_MAP[notif.type] ?? Info;
+                    const iconColor =
+                      NOTIFICATION_ICON_COLOR[notif.type] ??
+                      'text-muted-foreground';
+
+                    return (
+                      <button
+                        key={notif.id}
+                        className={cn(
+                          'flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50',
+                          !notif.isRead && 'bg-emerald-50/50 dark:bg-emerald-950/20',
+                        )}
+                        onClick={() => {
+                          if (!notif.isRead) {
+                            markReadMutation.mutate(notif.id);
+                          }
+                        }}
+                      >
+                        <div
+                          className={cn(
+                            'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted/80',
+                          )}
+                        >
+                          <IconComponent className={cn('size-4', iconColor)} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start gap-2">
+                            <p
+                              className={cn(
+                                'text-sm leading-snug',
+                                notif.isRead
+                                  ? 'text-muted-foreground'
+                                  : 'font-medium text-foreground',
+                              )}
+                            >
+                              {notif.title}
+                            </p>
+                            {!notif.isRead && (
+                              <span className="mt-1.5 size-2 shrink-0 rounded-full bg-emerald-500" />
+                            )}
+                          </div>
+                          {notif.message && (
+                            <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
+                              {notif.message}
+                            </p>
+                          )}
+                          <p className="mt-1 text-[11px] text-muted-foreground/70">
+                            {formatDistanceToNow(new Date(notif.createdAt), {
+                              addSuffix: true,
+                            })}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
 
         {/* User dropdown */}
         <DropdownMenu>

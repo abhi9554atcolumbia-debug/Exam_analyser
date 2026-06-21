@@ -61,6 +61,7 @@ import {
   type Exam,
 } from '@/lib/api';
 import { useNavigationStore } from '@/store/navigation';
+import { cn } from '@/lib/utils';
 
 // ─── Helpers ───────────────────────────────────────────────
 function getGreeting(): string {
@@ -396,7 +397,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Greeting */}
-      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3 rounded-xl bg-gradient-to-r from-emerald-50 to-transparent px-5 py-4 dark:from-emerald-950/20 dark:to-transparent sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {getGreeting()}, Aman 👋
@@ -405,9 +406,10 @@ export default function DashboardPage() {
             Here&apos;s your exam journey overview
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Last updated: {formatDate(now.toISOString())}
-        </p>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Clock className="size-3.5" />
+          <span>Last updated: {formatDate(now.toISOString())}</span>
+        </div>
       </div>
 
       {/* Stat Cards */}
@@ -419,37 +421,45 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard
-            icon={GraduationCap}
-            label="Total Exams"
-            value={data?.stats.totalExams ?? 0}
-            change="+2 this month"
-            trend="up"
-          />
-          <StatCard
-            icon={Trophy}
-            label="Qualified"
-            value={`${qualificationRate}%`}
-            change={`${data?.stats.qualified ?? 0} exams`}
-            trend={qualificationRate >= 50 ? 'up' : 'down'}
-            colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
-          />
-          <StatCard
-            icon={BarChart3}
-            label="Average Score"
-            value={`${data?.stats.avgScore ?? 0}%`}
-            change="+3.2% from last"
-            trend="up"
-            colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300"
-          />
-          <StatCard
-            icon={Target}
-            label="Avg Cutoff Gap"
-            value={data?.stats.avgCutoffGap ?? 0}
-            change={data && data.stats.avgCutoffGap > 0 ? 'Above cutoff' : 'Below cutoff'}
-            trend={data && data.stats.avgCutoffGap <= 0 ? 'up' : 'down'}
-            colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
-          />
+          <div className="transition-shadow duration-200 hover:shadow-md">
+            <StatCard
+              icon={GraduationCap}
+              label="Total Exams"
+              value={data?.stats.totalExams ?? 0}
+              change="+2 this month"
+              trend="up"
+            />
+          </div>
+          <div className="transition-shadow duration-200 hover:shadow-md">
+            <StatCard
+              icon={Trophy}
+              label="Qualified"
+              value={`${qualificationRate}%`}
+              change={`${data?.stats.qualified ?? 0} exams`}
+              trend={qualificationRate >= 50 ? 'up' : 'down'}
+              colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+            />
+          </div>
+          <div className="transition-shadow duration-200 hover:shadow-md">
+            <StatCard
+              icon={BarChart3}
+              label="Average Score"
+              value={`${data?.stats.avgScore ?? 0}%`}
+              change="+3.2% from last"
+              trend="up"
+              colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300"
+            />
+          </div>
+          <div className="transition-shadow duration-200 hover:shadow-md">
+            <StatCard
+              icon={Target}
+              label="Avg Cutoff Gap"
+              value={data?.stats.avgCutoffGap ?? 0}
+              change={data && data.stats.avgCutoffGap > 0 ? 'Above cutoff' : 'Below cutoff'}
+              trend={data && data.stats.avgCutoffGap <= 0 ? 'up' : 'down'}
+              colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+            />
+          </div>
         </div>
       )}
 
@@ -461,23 +471,25 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Button
             variant="outline"
-            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+            className="h-auto flex-col gap-2 rounded-xl border py-4 transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-sm dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
             onClick={() => setAddExamOpen(true)}
           >
             <Plus className="size-5 text-emerald-600 dark:text-emerald-400" />
             <span className="text-sm font-medium">Add Exam</span>
+            <span className="text-[11px] text-muted-foreground">Record a new result</span>
           </Button>
           <Button
             variant="outline"
-            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-teal-300 hover:bg-teal-50 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+            className="h-auto flex-col gap-2 rounded-xl border py-4 transition-all duration-200 hover:border-teal-300 hover:bg-teal-50 hover:shadow-sm dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
             onClick={() => navigate('upcoming')}
           >
             <CalendarPlus className="size-5 text-teal-600 dark:text-teal-400" />
-            <span className="text-sm font-medium">Add Upcoming Exam</span>
+            <span className="text-sm font-medium">Schedule Exam</span>
+            <span className="text-[11px] text-muted-foreground">Plan your next attempt</span>
           </Button>
           <Button
             variant="outline"
-            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+            className="h-auto flex-col gap-2 rounded-xl border py-4 transition-all duration-200 hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-sm dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
             onClick={() => navigate('documents')}
           >
             <div className="flex items-center gap-1">
@@ -485,14 +497,16 @@ export default function DashboardPage() {
               <Badge className="bg-emerald-600 text-[10px] px-1.5 py-0">NEW</Badge>
             </div>
             <span className="text-sm font-medium">Upload Scorecard</span>
+            <span className="text-[11px] text-muted-foreground">Attach your score PDF</span>
           </Button>
           <Button
             variant="outline"
-            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-teal-300 hover:bg-teal-50 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+            className="h-auto flex-col gap-2 rounded-xl border py-4 transition-all duration-200 hover:border-teal-300 hover:bg-teal-50 hover:shadow-sm dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
             onClick={() => navigate('reflections')}
           >
             <BookOpen className="size-5 text-teal-600 dark:text-teal-400" />
             <span className="text-sm font-medium">Add Reflection</span>
+            <span className="text-[11px] text-muted-foreground">Analyze your performance</span>
           </Button>
         </div>
       </div>
@@ -536,8 +550,8 @@ export default function DashboardPage() {
                 </div>
               ))
             ) : data && data.weakAreas.length > 0 ? (
-              data.weakAreas.map((area) => (
-                <div key={area.section} className="space-y-1.5">
+              data.weakAreas.map((area, idx) => (
+                <div key={area.section} className={cn('space-y-1.5 rounded-lg p-2.5 -mx-1', idx % 2 === 1 && 'bg-muted/40')}>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">
                       {area.section}
@@ -698,11 +712,20 @@ export default function DashboardPage() {
 
       {/* Smart Insights */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="flex items-center gap-2 text-base">
             <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
             Smart Insights
           </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-emerald-600 dark:text-emerald-400"
+            onClick={() => navigate('analytics')}
+          >
+            See All Insights
+            <ArrowRight className="ml-1 size-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -742,6 +765,19 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* View Full Analytics */}
+      <div className="flex justify-center">
+        <Button
+          variant="outline"
+          className="gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+          onClick={() => navigate('analytics')}
+        >
+          <BarChart3 className="size-4" />
+          View Full Analytics
+          <ArrowRight className="size-4" />
+        </Button>
+      </div>
 
       {/* Add Exam Dialog */}
       <AddExamDialog open={addExamOpen} onOpenChange={setAddExamOpen} />

@@ -21,6 +21,7 @@ import {
   Eye,
   FileText,
   Loader2,
+  SearchX,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -62,8 +63,21 @@ import {
   type Reflection,
 } from '@/lib/api';
 import { useNavigationStore } from '@/store/navigation';
+import { cn } from '@/lib/utils';
 
 // ─── Helpers ───────────────────────────────────────────────
+const CATEGORY_BORDER: Record<string, string> = {
+  Banking: 'border-l-emerald-500',
+  SSC: 'border-l-amber-500',
+  Railway: 'border-l-sky-500',
+  Insurance: 'border-l-violet-500',
+  Other: 'border-l-muted-foreground/30',
+};
+
+function getCategoryBorder(category: string): string {
+  return CATEGORY_BORDER[category] ?? 'border-l-muted-foreground/30';
+}
+
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-IN', {
@@ -356,33 +370,33 @@ function ExamDetailContent({
     : 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Overview Tab */}
       {activeTab === 'overview' && (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1 rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Category</p>
               <Badge variant="outline">{exam.category}</Badge>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Stage</p>
               <Badge variant="outline">{exam.stage}</Badge>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Organization</p>
               <p className="text-sm font-medium">{exam.org || '—'}</p>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-lg border p-3">
               <p className="text-xs text-muted-foreground">Attempt</p>
               <p className="text-sm font-medium">#{exam.attempt}</p>
             </div>
           </div>
 
-          <Separator />
+          <Separator className="my-1" />
 
           {/* Score */}
-          <div className="space-y-2">
+          <div className="space-y-3 rounded-lg border p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Overall Score</span>
               <span className="font-bold">{exam.score}/{exam.maxScore} ({scorePercent}%)</span>
@@ -407,7 +421,7 @@ function ExamDetailContent({
             </div>
           </div>
 
-          <Separator />
+          <Separator className="my-1" />
 
           {/* Sectional Scores */}
           {exam.sectionalScores.length > 0 && (
@@ -765,7 +779,10 @@ export default function ExamHistoryPage() {
                   return (
                     <Card
                       key={exam.id}
-                      className="cursor-pointer transition-all hover:border-emerald-200 hover:shadow-md dark:hover:border-emerald-800"
+                      className={cn(
+                        'cursor-pointer border-l-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:shadow-lg/10',
+                        getCategoryBorder(exam.category),
+                      )}
                       onClick={() => openDetail(exam.id)}
                     >
                       <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -832,9 +849,9 @@ export default function ExamHistoryPage() {
             </div>
           ))
         ) : (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center">
-            <GraduationCap className="mb-3 size-10 text-muted-foreground/40" />
-            <p className="font-medium text-muted-foreground">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-16 text-center">
+            <SearchX className="mb-4 size-12 text-muted-foreground/30" />
+            <p className="text-lg font-medium text-muted-foreground">
               No exams found
             </p>
             <p className="mt-1 text-sm text-muted-foreground/60">
@@ -842,11 +859,11 @@ export default function ExamHistoryPage() {
             </p>
             <Button
               variant="outline"
-              className="mt-4"
+              className="mt-6 gap-2 border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
               onClick={() => setAddExamOpen(true)}
             >
-              <Plus className="mr-2 size-4" />
-              Add Exam
+              <Plus className="size-4" />
+              Add Your First Exam
             </Button>
           </div>
         )}

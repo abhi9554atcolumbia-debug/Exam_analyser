@@ -235,7 +235,7 @@ export async function getWeaknessRecommendations() {
 
 // ─── Notifications ─────────────────────────────────────────
 export interface Notification { id: string; title: string; message: string | null; type: string; isRead: boolean; createdAt: string; }
-export async function getNotifications() { return request<Notification[]>('/notifications'); }
+export async function getNotifications() { return request<{ data: Notification[]; unreadCount: number }>('/notifications').then(r => r.data); }
 export async function markNotificationRead(id: string) { return request<Notification>(`/notifications/${id}`, { method: 'PUT', body: JSON.stringify({ isRead: true }) }); }
 export async function markAllNotificationsRead() { return request<{ count: number }>('/notifications', { method: 'PUT', body: JSON.stringify({ markAllRead: true }) }); }
 

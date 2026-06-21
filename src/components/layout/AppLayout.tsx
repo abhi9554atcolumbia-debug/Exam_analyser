@@ -6,6 +6,8 @@ import { Sidebar, MobileSidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useNavigationStore } from '@/store/navigation';
 import { useUserStore } from '@/store/user-store';
+import { useQuery } from '@tanstack/react-query';
+import { getUser, getNotifications } from '@/lib/api';
 
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
@@ -25,21 +27,43 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
   const { currentPage } = useNavigationStore();
-
-  // Set mock user data so the UI has something to render
   const setProfile = useUserStore((s) => s.setProfile);
+  const setNotificationsCount = useUserStore((s) => s.setNotificationsCount);
+
+  // Fetch real user profile from API
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: getUser,
+    staleTime: 60_000,
+  });
+
+  // Fetch notification count
+  const { data: notifications } = useQuery({
+    queryKey: ['notifications-count'],
+    queryFn: getNotifications,
+    staleTime: 30_000,
+  });
+
+  // Sync user profile to store
   useEffect(() => {
-    if (!useUserStore.getState().profile) {
+    if (userProfile) {
       setProfile({
-        id: '1',
-        name: 'Alex Chen',
-        email: 'alex@example.com',
-        avatarUrl: null,
-        plan: 'free',
-        joinedAt: '2025-01-15',
+        id: userProfile.id,
+        name: userProfile.name,
+        email: userProfile.email,
+        avatarUrl: userProfile.avatar,
+        plan: userProfile.plan as 'free' | 'pro',
+        joinedAt: userProfile.memberSince ?? '2024',
       });
     }
-  }, [setProfile]);
+  }, [userProfile, setProfile]);
+
+  // Sync notification count
+  useEffect(() => {
+    if (notifications) {
+      setNotificationsCount(notifications.filter((n) => !n.isRead).length);
+    }
+  }, [notifications, setNotificationsCount]);
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -52,7 +76,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 p-4 sm:p-6">
+        <main className="flex-1 p-4 sm:p-6 pb-20 sm:pb-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}

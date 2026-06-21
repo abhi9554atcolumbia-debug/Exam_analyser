@@ -197,11 +197,11 @@ export default function CalendarPage() {
         {/* Calendar Grid */}
         <div className="lg:col-span-3">
           {/* Legend */}
-          <div className="flex flex-wrap gap-3 mb-4">
+          <div className="flex flex-wrap items-center gap-4 mb-4">
             {Object.entries(eventTypeConfig).map(([type, cfg]) => (
-              <div key={type} className="flex items-center gap-1.5">
-                <div className={cn('size-2.5 rounded-full', cfg.dot)} />
-                <span className="text-xs text-muted-foreground">{cfg.label}</span>
+              <div key={type} className="flex items-center gap-2">
+                <div className={cn('size-3 rounded-full', cfg.dot)} />
+                <span className="text-xs font-medium text-muted-foreground">{cfg.label}</span>
               </div>
             ))}
           </div>
@@ -227,10 +227,10 @@ export default function CalendarPage() {
                   key={idx}
                   onClick={() => setSelectedDay(day)}
                   className={cn(
-                    'relative rounded-lg p-1.5 text-left transition-colors min-h-[4rem] sm:min-h-[5rem]',
+                    'relative rounded-lg p-1.5 text-left transition-all duration-200 min-h-[4rem] sm:min-h-[5rem]',
                     today && 'ring-2 ring-emerald-500 ring-offset-1 dark:ring-offset-background',
                     isSelected && 'bg-emerald-50 dark:bg-emerald-950/40',
-                    !isSelected && !today && 'hover:bg-muted/50',
+                    !isSelected && !today && 'hover:bg-muted/50 hover:shadow-sm',
                     !inMonth && 'opacity-40',
                   )}
                 >
@@ -293,7 +293,7 @@ export default function CalendarPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Today's Schedule */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Clock className="size-4 text-emerald-500" /> Today&apos;s Schedule
@@ -319,7 +319,7 @@ export default function CalendarPage() {
           </Card>
 
           {/* Upcoming Events */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <CalendarDays className="size-4 text-teal-500" /> Upcoming Events
@@ -343,7 +343,7 @@ export default function CalendarPage() {
           </Card>
 
           {/* Study Streak */}
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Flame className="size-4 text-orange-500" /> Activity Streak

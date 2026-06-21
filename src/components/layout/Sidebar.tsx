@@ -110,9 +110,9 @@ function SidebarContent() {
   const isPro = profile?.plan === 'pro';
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-5">
+      <div className="flex shrink-0 items-center gap-3 px-4 py-5">
         <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-600 dark:bg-emerald-500">
           <GraduationCap className="size-5 text-white" />
         </div>
@@ -126,10 +126,10 @@ function SidebarContent() {
         </div>
       </div>
 
-      <Separator />
+      <Separator className="shrink-0" />
 
-      {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-3">
+      {/* Navigation — ScrollArea with min-h-0 so it shrinks in flex */}
+      <ScrollArea className="min-h-0 flex-1 px-3 py-3">
         <nav className="flex flex-col gap-1" aria-label="Main navigation">
           {NAV_ITEMS.map((item) => (
             <NavItem
@@ -171,10 +171,10 @@ function SidebarContent() {
         )}
       </ScrollArea>
 
-      <Separator />
+      <Separator className="shrink-0" />
 
-      {/* Footer */}
-      <div className="px-3 py-3">
+      {/* Footer — always visible at bottom */}
+      <div className="shrink-0 px-3 py-3">
         {FOOTER_ITEMS.map((item) => (
           <NavItem
             key={item.id}

@@ -1,0 +1,751 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo } from 'react';
+     4→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+     5→import { toast } from 'sonner';
+     6→import {
+     7→  GraduationCap,
+     8→  Trophy,
+     9→  BarChart3,
+    10→  Target,
+    11→  Plus,
+    12→  CalendarPlus,
+    13→  Upload,
+    14→  BookOpen,
+    15→  TrendingUp,
+    16→  Clock,
+    17→  AlertTriangle,
+    18→  CheckCircle2,
+    19→  XCircle,
+    20→  Lightbulb,
+    21→  ArrowRight,
+    22→  Sparkles,
+    23→} from 'lucide-react';
+    24→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    25→import { Button } from '@/components/ui/button';
+    26→import { Badge } from '@/components/ui/badge';
+    27→import { Input } from '@/components/ui/input';
+    28→import { Label } from '@/components/ui/label';
+    29→import { Skeleton } from '@/components/ui/skeleton';
+    30→import {
+    31→  Dialog,
+    32→  DialogContent,
+    33→  DialogHeader,
+    34→  DialogTitle,
+    35→  DialogTrigger,
+    36→  DialogFooter,
+    37→  DialogClose,
+    38→} from '@/components/ui/dialog';
+    39→import {
+    40→  Select,
+    41→  SelectContent,
+    42→  SelectItem,
+    43→  SelectTrigger,
+    44→  SelectValue,
+    45→} from '@/components/ui/select';
+    46→import {
+    47→  Table,
+    48→  TableBody,
+    49→  TableCell,
+    50→  TableHead,
+    51→  TableHeader,
+    52→  TableRow,
+    53→} from '@/components/ui/table';
+    54→import { StatCard } from '@/components/ui/StatCard';
+    55→import { ProgressBar } from '@/components/ui/ProgressBar';
+    56→import { TrendLineChart } from '@/components/charts/TrendLineChart';
+    57→import {
+    58→  getDashboard,
+    59→  createExam,
+    60→  type DashboardData,
+    61→  type Exam,
+    62→} from '@/lib/api';
+    63→import { useNavigationStore } from '@/store/navigation';
+    64→
+    65→// ─── Helpers ───────────────────────────────────────────────
+    66→function getGreeting(): string {
+    67→  const h = new Date().getHours();
+    68→  if (h < 12) return 'Good morning';
+    69→  if (h < 17) return 'Good afternoon';
+    70→  return 'Good evening';
+    71→}
+    72→
+    73→function formatDate(dateStr: string): string {
+    74→  const d = new Date(dateStr);
+    75→  return d.toLocaleDateString('en-IN', {
+    76→    day: 'numeric',
+    77→    month: 'short',
+    78→    year: 'numeric',
+    79→  });
+    80→}
+    81→
+    82→function formatCountdown(days: number | null): string {
+    83→  if (days === null || days === undefined) return '—';
+    84→  if (days === 0) return 'Today!';
+    85→  if (days === 1) return 'Tomorrow';
+    86→  return `${days} days left`;
+    87→}
+    88→
+    89→// ─── Add Exam Dialog ────────────────────────────────────────
+    90→function AddExamDialog({
+    91→  open,
+    92→  onOpenChange,
+    93→}: {
+    94→  open: boolean;
+    95→  onOpenChange: (open: boolean) => void;
+    96→}) {
+    97→  const queryClient = useQueryClient();
+    98→
+    99→  const [form, setForm] = useState({
+   100→    name: '',
+   101→    org: '',
+   102→    category: 'Banking',
+   103→    stage: 'Prelims',
+   104→    examDate: '',
+   105→    score: '',
+   106→    maxScore: '100',
+   107→    cutoff: '',
+   108→    result: 'Not Qualified',
+   109→    sections: [] as { section: string; score: string; max: string }[],
+   110→  });
+   111→
+   112→  const mutation = useMutation({
+   113→    mutationFn: () =>
+   114→      createExam({
+   115→        name: form.name,
+   116→        org: form.org || undefined,
+   117→        category: form.category,
+   118→        stage: form.stage,
+   119→        examDate: form.examDate,
+   120→        score: Number(form.score),
+   121→        maxScore: Number(form.maxScore),
+   122→        cutoff: Number(form.cutoff),
+   123→        result: form.result,
+   124→        sectionalScores: form.sections
+   125→          .filter((s) => s.section)
+   126→          .map((s) => ({
+   127→            section: s.section,
+   128→            score: Number(s.score),
+   129→            max: Number(s.max),
+   130→          })),
+   131→      }),
+   132→    onSuccess: () => {
+   133→      toast.success('Exam added successfully!');
+   134→      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+   135→      onOpenChange(false);
+   136→      setForm({
+   137→        name: '',
+   138→        org: '',
+   139→        category: 'Banking',
+   140→        stage: 'Prelims',
+   141→        examDate: '',
+   142→        score: '',
+   143→        maxScore: '100',
+   144→        cutoff: '',
+   145→        result: 'Not Qualified',
+   146→        sections: [],
+   147→      });
+   148→    },
+   149→    onError: () => {
+   150→      toast.error('Failed to add exam. Please try again.');
+   151→    },
+   152→  });
+   153→
+   154→  const addSection = () => {
+   155→    setForm((f) => [
+   156→      ...f.sections,
+   157→      { section: '', score: '', max: '' },
+   158→    ]);
+   159→  };
+   160→
+   161→  const removeSection = (idx: number) => {
+   162→    setForm((f) => f.sections.filter((_, i) => i !== idx));
+   163→  };
+   164→
+   165→  const updateSection = (
+   166→    idx: number,
+   167→    field: 'section' | 'score' | 'max',
+   168→    value: string,
+   169→  ) => {
+   170→    setForm((f) =>
+   171→      f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+   172→    );
+   173→  };
+   174→
+   175→  return (
+   176→    <Dialog open={open} onOpenChange={onOpenChange}>
+   177→      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+   178→        <DialogHeader>
+   179→          <DialogTitle>Add Exam Result</DialogTitle>
+   180→        </DialogHeader>
+   181→
+   182→        <div className="grid gap-4 py-2">
+   183→          <div className="grid gap-2">
+   184→            <Label htmlFor="exam-name">Exam Name</Label>
+   185→            <Input
+   186→              id="exam-name"
+   187→              placeholder="e.g. SBI PO 2025"
+   188→              value={form.name}
+   189→              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+   190→            />
+   191→          </div>
+   192→
+   193→          <div className="grid grid-cols-2 gap-4">
+   194→            <div className="grid gap-2">
+   195→              <Label htmlFor="exam-org">Organization</Label>
+   196→              <Input
+   197→                id="exam-org"
+   198→                placeholder="e.g. SBI"
+   199→                value={form.org}
+   200→                onChange={(e) => setForm((f) => ({ ...f, org: e.target.value }))}
+   201→              />
+   202→            </div>
+   203→            <div className="grid gap-2">
+   204→              <Label>Category</Label>
+   205→              <Select
+   206→                value={form.category}
+   207→                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+   208→              >
+   209→                <SelectTrigger>
+   210→                  <SelectValue />
+   211→                </SelectTrigger>
+   212→                <SelectContent>
+   213→                  <SelectItem value="Banking">Banking</SelectItem>
+   214→                  <SelectItem value="SSC">SSC</SelectItem>
+   215→                  <SelectItem value="Railway">Railway</SelectItem>
+   216→                  <SelectItem value="Insurance">Insurance</SelectItem>
+   217→                  <SelectItem value="Other">Other</SelectItem>
+   218→                </SelectContent>
+   219→              </Select>
+   220→            </div>
+   221→          </div>
+   222→
+   223→          <div className="grid grid-cols-2 gap-4">
+   224→            <div className="grid gap-2">
+   225→              <Label>Stage</Label>
+   226→              <Select
+   227→                value={form.stage}
+   228→                onValueChange={(v) => setForm((f) => ({ ...f, stage: v }))}
+   229→              >
+   230→                <SelectTrigger>
+   231→                  <SelectValue />
+   232→                </SelectTrigger>
+   233→                <SelectContent>
+   234→                  <SelectItem value="Prelims">Prelims</SelectItem>
+   235→                  <SelectItem value="Mains">Mains</SelectItem>
+   236→                  <SelectItem value="Interview">Interview</SelectItem>
+   237→                  <SelectItem value="Final">Final</SelectItem>
+   238→                </SelectContent>
+   239→              </Select>
+   240→            </div>
+   241→            <div className="grid gap-2">
+   242→              <Label htmlFor="exam-date">Exam Date</Label>
+   243→              <Input
+   244→                id="exam-date"
+   245→                type="date"
+   246→                value={form.examDate}
+   247→                onChange={(e) =>
+   248→                  setForm((f) => ({ ...f, examDate: e.target.value }))
+   249→                }
+   250→              />
+   251→            </div>
+   252→          </div>
+   253→
+   254→          <div className="grid grid-cols-3 gap-4">
+   255→            <div className="grid gap-2">
+   256→              <Label htmlFor="score">Score</Label>
+   257→              <Input
+   258→                id="score"
+   259→                type="number"
+   260→                placeholder="0"
+   261→                value={form.score}
+   262→                onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))}
+   263→              />
+   264→            </div>
+   265→            <div className="grid gap-2">
+   266→              <Label htmlFor="max-score">Max Score</Label>
+   267→              <Input
+   268→                id="max-score"
+   269→                type="number"
+   270→                placeholder="100"
+   271→                value={form.maxScore}
+   272→                onChange={(e) =>
+   273→                  setForm((f) => ({ ...f, maxScore: e.target.value }))
+   274→                }
+   275→              />
+   276→            </div>
+   277→            <div className="grid gap-2">
+   278→              <Label htmlFor="cutoff">Cutoff</Label>
+   279→              <Input
+   280→                id="cutoff"
+   281→                type="number"
+   282→                placeholder="0"
+   283→                value={form.cutoff}
+   284→                onChange={(e) =>
+   285→                  setForm((f) => ({ ...f, cutoff: e.target.value }))
+   286→                }
+   287→              />
+   288→            </div>
+   289→          </div>
+   290→
+   291→          <div className="grid gap-2">
+   292→            <Label>Result</Label>
+   293→            <Select
+   294→              value={form.result}
+   295→              onValueChange={(v) => setForm((f) => ({ ...f, result: v }))}
+   296→            >
+   297→              <SelectTrigger>
+   298→                <SelectValue />
+   299→              </SelectTrigger>
+   300→              <SelectContent>
+   301→                <SelectItem value="Qualified">Qualified</SelectItem>
+   302→                <SelectItem value="Not Qualified">Not Qualified</SelectItem>
+   303→                <SelectItem value="Awaited">Result Awaited</SelectItem>
+   304→              </SelectContent>
+   305→            </Select>
+   306→          </div>
+   307→
+   308→          {/* Sectional Scores */}
+   309→          <div className="grid gap-3">
+   310→            <div className="flex items-center justify-between">
+   311→              <Label>Sectional Scores (optional)</Label>
+   312→              <Button
+   313→                variant="outline"
+   314→                size="sm"
+   315→                type="button"
+   316→                onClick={addSection}
+   317→              >
+   318→                <Plus className="mr-1 size-3.5" />
+   319→                Add Section
+   320→              </Button>
+   321→            </div>
+   322→            {form.sections.map((sec, idx) => (
+   323→              <div key={idx} className="grid grid-cols-[1fr_80px_80px_auto] gap-2">
+   324→                <Input
+   325→                  placeholder="Section name"
+   326→                  value={sec.section}
+   327→                  onChange={(e) =>
+   328→                    updateSection(idx, 'section', e.target.value)
+   329→                  }
+   330→                />
+   331→                <Input
+   332→                  type="number"
+   333→                  placeholder="Score"
+   334→                  value={sec.score}
+   335→                  onChange={(e) =>
+   336→                    updateSection(idx, 'score', e.target.value)
+   337→                  }
+   338→                />
+   339→                <Input
+   340→                  type="number"
+   341→                  placeholder="Max"
+   342→                  value={sec.max}
+   343→                  onChange={(e) =>
+   344→                    updateSection(idx, 'max', e.target.value)
+   345→                  }
+   346→                />
+   347→                <Button
+   348→                  variant="ghost"
+   349→                  size="icon"
+   350→                  onClick={() => removeSection(idx)}
+   351→                >
+   352→                  <XCircle className="size-4 text-muted-foreground" />
+   353→                </Button>
+   354→              </div>
+   355→            ))}
+   356→          </div>
+   357→        </div>
+   358→
+   359→        <DialogFooter>
+   360→          <DialogClose asChild>
+   361→            <Button variant="outline">Cancel</Button>
+   362→          </DialogClose>
+   363→          <Button
+   364→            onClick={() => mutation.mutate()}
+   365→            disabled={mutation.isPending || !form.name || !form.examDate || !form.score}
+   366→          >
+   367→            {mutation.isPending ? 'Saving...' : 'Add Exam'}
+   368→          </Button>
+   369→        </DialogFooter>
+   370→      </DialogContent>
+   371→    </Dialog>
+   372→  );
+   373→}
+   374→
+   375→// ─── Dashboard Page ─────────────────────────────────────────
+   376→export default function DashboardPage() {
+   377→  const navigate = useNavigationStore((s) => s.navigate);
+   378→  const [addExamOpen, setAddExamOpen] = useState(false);
+   379→
+   380→  const { data, isLoading } = useQuery<DashboardData>({
+   381→    queryKey: ['dashboard'],
+   382→    queryFn: getDashboard,
+   383→  });
+   384→
+   385→  const qualificationRate = useMemo(() => {
+   386→    if (!data) return 0;
+   387→    return data.stats.totalExams > 0
+   388→      ? Math.round(
+   389→          (data.stats.qualified / data.stats.totalExams) * 100,
+   390→        )
+   391→      : 0;
+   392→  }, [data]);
+   393→
+   394→  const now = new Date();
+   395→
+   396→  return (
+   397→    <div className="space-y-6">
+   398→      {/* Greeting */}
+   399→      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+   400→        <div>
+   401→          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+   402→            {getGreeting()}, Aman 👋
+   403→          </h1>
+   404→          <p className="text-sm text-muted-foreground">
+   405→            Here&apos;s your exam journey overview
+   406→          </p>
+   407→        </div>
+   408→        <p className="text-xs text-muted-foreground">
+   409→          Last updated: {formatDate(now.toISOString())}
+   410→        </p>
+   411→      </div>
+   412→
+   413→      {/* Stat Cards */}
+   414→      {isLoading ? (
+   415→        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+   416→          {Array.from({ length: 4 }).map((_, i) => (
+   417→            <Skeleton key={i} className="h-[108px] rounded-xl" />
+   418→          ))}
+   419→        </div>
+   420→      ) : (
+   421→        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+   422→          <StatCard
+   423→            icon={GraduationCap}
+   424→            label="Total Exams"
+   425→            value={data?.stats.totalExams ?? 0}
+   426→            change="+2 this month"
+   427→            trend="up"
+   428→          />
+   429→          <StatCard
+   430→            icon={Trophy}
+   431→            label="Qualified"
+   432→            value={`${qualificationRate}%`}
+   433→            change={`${data?.stats.qualified ?? 0} exams`}
+   434→            trend={qualificationRate >= 50 ? 'up' : 'down'}
+   435→            colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+   436→          />
+   437→          <StatCard
+   438→            icon={BarChart3}
+   439→            label="Average Score"
+   440→            value={`${data?.stats.avgScore ?? 0}%`}
+   441→            change="+3.2% from last"
+   442→            trend="up"
+   443→            colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300"
+   444→          />
+   445→          <StatCard
+   446→            icon={Target}
+   447→            label="Avg Cutoff Gap"
+   448→            value={data?.stats.avgCutoffGap ?? 0}
+   449→            change={data && data.stats.avgCutoffGap > 0 ? 'Above cutoff' : 'Below cutoff'}
+   450→            trend={data && data.stats.avgCutoffGap <= 0 ? 'up' : 'down'}
+   451→            colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+   452→          />
+   453→        </div>
+   454→      )}
+   455→
+   456→      {/* Quick Actions */}
+   457→      <div>
+   458→        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+   459→          Quick Actions
+   460→        </h2>
+   461→        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   462→          <Button
+   463→            variant="outline"
+   464→            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+   465→            onClick={() => setAddExamOpen(true)}
+   466→          >
+   467→            <Plus className="size-5 text-emerald-600 dark:text-emerald-400" />
+   468→            <span className="text-sm font-medium">Add Exam</span>
+   469→          </Button>
+   470→          <Button
+   471→            variant="outline"
+   472→            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-teal-300 hover:bg-teal-50 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+   473→            onClick={() => navigate('upcoming')}
+   474→          >
+   475→            <CalendarPlus className="size-5 text-teal-600 dark:text-teal-400" />
+   476→            <span className="text-sm font-medium">Add Upcoming Exam</span>
+   477→          </Button>
+   478→          <Button
+   479→            variant="outline"
+   480→            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+   481→            onClick={() => navigate('documents')}
+   482→          >
+   483→            <div className="flex items-center gap-1">
+   484→              <Upload className="size-5 text-emerald-600 dark:text-emerald-400" />
+   485→              <Badge className="bg-emerald-600 text-[10px] px-1.5 py-0">NEW</Badge>
+   486→            </div>
+   487→            <span className="text-sm font-medium">Upload Scorecard</span>
+   488→          </Button>
+   489→          <Button
+   490→            variant="outline"
+   491→            className="h-auto flex-col gap-2 rounded-xl border-2 py-4 hover:border-teal-300 hover:bg-teal-50 dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+   492→            onClick={() => navigate('reflections')}
+   493→          >
+   494→            <BookOpen className="size-5 text-teal-600 dark:text-teal-400" />
+   495→            <span className="text-sm font-medium">Add Reflection</span>
+   496→          </Button>
+   497→        </div>
+   498→      </div>
+   499→
+   500→      {/* Score Trend */}
+   501→      <Card>
+   502→        <CardHeader>
+   503→          <CardTitle className="text-base">Score Trend</CardTitle>
+   504→        </CardHeader>
+   505→        <CardContent>
+   506→          {isLoading ? (
+   507→            <Skeleton className="h-[280px] w-full rounded-lg" />
+   508→          ) : data && data.scoreTrend.length > 0 ? (
+   509→            <TrendLineChart
+   510→              data={data.scoreTrend}
+   511→              dataKey="score"
+   512→              xKey="name"
+   513→              height={280}
+   514→            />
+   515→          ) : (
+   516→            <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+   517→              No exam data yet. Add your first exam to see trends.
+   518→            </div>
+   519→          )}
+   520→        </CardContent>
+   521→      </Card>
+   522→
+   523→      {/* Two column grid: Weak Areas + Upcoming Deadlines */}
+   524→      <div className="grid gap-6 lg:grid-cols-2">
+   525→        {/* Weak Areas */}
+   526→        <Card>
+   527→          <CardHeader>
+   528→            <CardTitle className="text-base">Weak Areas</CardTitle>
+   529→          </CardHeader>
+   530→          <CardContent className="space-y-4">
+   531→            {isLoading ? (
+   532→              Array.from({ length: 3 }).map((_, i) => (
+   533→                <div key={i} className="space-y-2">
+   534→                  <Skeleton className="h-4 w-24" />
+   535→                  <Skeleton className="h-2 w-full" />
+   536→                </div>
+   537→              ))
+   538→            ) : data && data.weakAreas.length > 0 ? (
+   539→              data.weakAreas.map((area) => (
+   540→                <div key={area.section} className="space-y-1.5">
+   541→                  <div className="flex items-center justify-between text-sm">
+   542→                    <span className="font-medium text-foreground">
+   543→                      {area.section}
+   544→                    </span>
+   545→                    <span className="text-muted-foreground">
+   546→                      {area.avgScore}% avg across {area.exams} exam
+   547→                      {area.exams !== 1 ? 's' : ''}
+   548→                    </span>
+   549→                  </div>
+   550→                  <ProgressBar
+   551→                    percent={area.avgScore}
+   552→                    color={
+   553→                      area.avgScore >= 60
+   554→                        ? 'bg-emerald-600 dark:bg-emerald-500'
+   555→                        : area.avgScore >= 40
+   556→                          ? 'bg-amber-500 dark:bg-amber-400'
+   557→                          : 'bg-red-500 dark:bg-red-400'
+   558→                    }
+   559→                    height="h-2"
+   560→                  />
+   561→                  <p className="text-xs text-muted-foreground">
+   562→                    {area.avgScore >= 60
+   563→                      ? 'Good performance. Maintain consistency.'
+   564→                      : area.avgScore >= 40
+   565→                        ? 'Needs improvement. Practice more problems.'
+   566→                        : 'Critical area. Focus on fundamentals.'}
+   567→                  </p>
+   568→                </div>
+   569→              ))
+   570→            ) : (
+   571→              <p className="text-sm text-muted-foreground">
+   572→                No weak areas identified yet.
+   573→              </p>
+   574→            )}
+   575→          </CardContent>
+   576→        </Card>
+   577→
+   578→        {/* Upcoming Deadlines */}
+   579→        <Card>
+   580→          <CardHeader>
+   581→            <CardTitle className="text-base">Upcoming Deadlines</CardTitle>
+   582→          </CardHeader>
+   583→          <CardContent>
+   584→            {isLoading ? (
+   585→              Array.from({ length: 3 }).map((_, i) => (
+   586→                <Skeleton key={i} className="mb-3 h-12 rounded-lg" />
+   587→              ))
+   588→            ) : data && data.upcomingDeadlines.length > 0 ? (
+   589→              <div className="space-y-3">
+   590→                {data.upcomingDeadlines.map((item) => (
+   591→                  <div
+   592→                    key={item.id}
+   593→                    className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-muted/50"
+   594→                  >
+   595→                    <div className="flex items-center gap-3">
+   596→                      <div
+   597→                        className={`flex size-9 items-center justify-center rounded-lg ${
+   598→                          (item.daysLeft ?? 0) <= 7
+   599→                            ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+   600→                            : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400'
+   601→                        }`}
+   602→                      >
+   603→                        <Clock className="size-4" />
+   604→                      </div>
+   605→                      <div>
+   606→                        <p className="text-sm font-medium">{item.name}</p>
+   607→                        <p className="text-xs text-muted-foreground">
+   608→                          {formatDate(item.examDate)}
+   609→                        </p>
+   610→                      </div>
+   611→                    </div>
+   612→                    <Badge
+   613→                      variant={
+   614→                        (item.daysLeft ?? 0) <= 7 ? 'destructive' : 'secondary'
+   615→                      }
+   616→                    >
+   617→                      {formatCountdown(item.daysLeft)}
+   618→                    </Badge>
+   619→                  </div>
+   620→                ))}
+   621→              </div>
+   622→            ) : (
+   623→              <p className="text-sm text-muted-foreground">
+   624→                No upcoming deadlines. Add exams to stay on track.
+   625→              </p>
+   626→            )}
+   627→          </CardContent>
+   628→        </Card>
+   629→      </div>
+   630→
+   631→      {/* Recent Exams Table */}
+   632→      <Card>
+   633→        <CardHeader className="flex flex-row items-center justify-between">
+   634→          <CardTitle className="text-base">Recent Exams</CardTitle>
+   635→          <Button
+   636→            variant="ghost"
+   637→            size="sm"
+   638→            className="text-emerald-600 dark:text-emerald-400"
+   639→            onClick={() => navigate('history')}
+   640→          >
+   641→            View All
+   642→            <ArrowRight className="ml-1 size-4" />
+   643→          </Button>
+   644→        </CardHeader>
+   645→        <CardContent>
+   646→          {isLoading ? (
+   647→            <div className="space-y-3">
+   648→              {Array.from({ length: 3 }).map((_, i) => (
+   649→                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+   650→              ))}
+   651→            </div>
+   652→          ) : data && data.recentExams.length > 0 ? (
+   653→            <Table>
+   654→              <TableHeader>
+   655→                <TableRow>
+   656→                  <TableHead>Exam</TableHead>
+   657→                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+   658→                  <TableHead className="hidden md:table-cell">Category</TableHead>
+   659→                  <TableHead className="text-right">Score</TableHead>
+   660→                  <TableHead className="text-right">Result</TableHead>
+   661→                </TableRow>
+   662→              </TableHeader>
+   663→              <TableBody>
+   664→                {data.recentExams.map((exam) => (
+   665→                  <TableRow key={exam.id}>
+   666→                    <TableCell className="font-medium">{exam.name}</TableCell>
+   667→                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+   668→                      {formatDate(exam.date)}
+   669→                    </TableCell>
+   670→                    <TableCell className="hidden md:table-cell">
+   671→                      <Badge variant="outline">{exam.category}</Badge>
+   672→                    </TableCell>
+   673→                    <TableCell className="text-right font-semibold">
+   674→                      {exam.score}%
+   675→                    </TableCell>
+   676→                    <TableCell className="text-right">
+   677→                      <Badge
+   678→                        className={
+   679→                          exam.result === 'Qualified'
+   680→                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+   681→                            : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+   682→                        }
+   683→                      >
+   684→                        {exam.result}
+   685→                      </Badge>
+   686→                    </TableCell>
+   687→                  </TableRow>
+   688→                ))}
+   689→              </TableBody>
+   690→            </Table>
+   691→          ) : (
+   692→            <div className="flex h-[120px] items-center justify-center text-sm text-muted-foreground">
+   693→              No exams recorded yet. Start by adding your first exam!
+   694→            </div>
+   695→          )}
+   696→        </CardContent>
+   697→      </Card>
+   698→
+   699→      {/* Smart Insights */}
+   700→      <Card>
+   701→        <CardHeader>
+   702→          <CardTitle className="flex items-center gap-2 text-base">
+   703→            <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
+   704→            Smart Insights
+   705→          </CardTitle>
+   706→        </CardHeader>
+   707→        <CardContent>
+   708→          {isLoading ? (
+   709→            <div className="space-y-3">
+   710→              {Array.from({ length: 2 }).map((_, i) => (
+   711→                <Skeleton key={i} className="h-16 w-full rounded-lg" />
+   712→              ))}
+   713→            </div>
+   714→          ) : data && data.smartInsights.length > 0 ? (
+   715→            <ul className="space-y-3">
+   716→              {data.smartInsights.map((insight, i) => (
+   717→                <li
+   718→                  key={i}
+   719→                  className="flex items-start gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+   720→                >
+   721→                  <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40">
+   722→                    {insight.includes('improvement') || insight.includes('momentum') ? (
+   723→                      <TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />
+   724→                    ) : insight.includes('⚠️') ? (
+   725→                      <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
+   726→                    ) : insight.includes('weak') || insight.includes('dipped') ? (
+   727→                      <Target className="size-4 text-red-600 dark:text-red-400" />
+   728→                    ) : (
+   729→                      <Lightbulb className="size-4 text-emerald-600 dark:text-emerald-400" />
+   730→                    )}
+   731→                  </div>
+   732→                  <p className="text-sm leading-relaxed text-foreground">
+   733→                    {insight}
+   734→                  </p>
+   735→                </li>
+   736→              ))}
+   737→            </ul>
+   738→          ) : (
+   739→            <p className="text-sm text-muted-foreground">
+   740→              Add more exam data to generate personalized insights.
+   741→            </p>
+   742→          )}
+   743→        </CardContent>
+   744→      </Card>
+   745→
+   746→      {/* Add Exam Dialog */}
+   747→      <AddExamDialog open={addExamOpen} onOpenChange={setAddExamOpen} />
+   748→    </div>
+   749→  );
+   750→}
+   751→
