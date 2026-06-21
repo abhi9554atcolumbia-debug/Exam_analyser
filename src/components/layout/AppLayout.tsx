@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Sidebar, MobileSidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { CommandSearch } from '@/components/CommandSearch';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNavigationStore } from '@/store/navigation';
 import { useUserStore } from '@/store/user-store';
 import { useQuery } from '@tanstack/react-query';
@@ -78,19 +79,21 @@ export function AppLayout({ children }: AppLayoutProps) {
       <div className="flex flex-1 flex-col min-w-0">
         <Topbar />
         <main className="flex-1 p-4 sm:p-6 pb-20 sm:pb-6">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-              className="mx-auto w-full max-w-7xl"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+          <ErrorBoundary>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentPage}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={pageTransition}
+                className="mx-auto w-full max-w-7xl"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          </ErrorBoundary>
         </main>
       </div>
 

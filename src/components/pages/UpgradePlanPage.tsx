@@ -3,13 +3,13 @@
 import { useState } from 'react';
 import {
   Sparkles, Check, X, Zap, BarChart3, BrainCircuit, Target,
-  Shield, Crown, Star, ChevronRight, HelpCircle,
+  Shield, Crown, Star, ChevronRight, HelpCircle, Quote,
+  Gem, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
@@ -22,6 +22,9 @@ interface Plan {
   priceMonthly: number;
   priceYearly: number;
   badge: string;
+  borderColor: string;
+  gradientFrom: string;
+  gradientTo: string;
   features: { label: string; included: boolean }[];
   current?: boolean;
 }
@@ -33,6 +36,9 @@ const plans: Plan[] = [
     priceMonthly: 0,
     priceYearly: 0,
     badge: 'Current Plan',
+    borderColor: 'border-gray-300 dark:border-gray-600',
+    gradientFrom: 'from-gray-400',
+    gradientTo: 'to-gray-500',
     current: true,
     features: [
       { label: 'Track up to 5 exams', included: true },
@@ -56,6 +62,9 @@ const plans: Plan[] = [
     priceMonthly: 149,
     priceYearly: 119,
     badge: 'Most Popular',
+    borderColor: 'border-emerald-500',
+    gradientFrom: 'from-emerald-400',
+    gradientTo: 'to-emerald-600',
     features: [
       { label: 'Unlimited exam tracking', included: true },
       { label: 'Advanced score analytics', included: true },
@@ -78,6 +87,9 @@ const plans: Plan[] = [
     priceMonthly: 249,
     priceYearly: 199,
     badge: 'Best Value',
+    borderColor: 'border-amber-500',
+    gradientFrom: 'from-amber-400',
+    gradientTo: 'to-amber-600',
     features: [
       { label: 'Unlimited exam tracking', included: true },
       { label: 'Advanced score analytics', included: true },
@@ -96,17 +108,11 @@ const plans: Plan[] = [
   },
 ];
 
-const compareFeatures = [
-  'Exams Tracked', 'Score Analytics', 'Goal Tracking', 'Calendar',
-  'Reflections', 'Smart Insights', 'Weakness Heatmap', 'AI Recommendations',
-  'Document Storage', 'Priority Support', 'Custom Themes', 'Data Export', 'Advanced Analytics',
-];
-
 const benefits = [
-  { title: 'AI-Powered Insights', description: 'Get personalized recommendations based on your performance patterns and study habits', icon: BrainCircuit, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
-  { title: 'Advanced Analytics', description: 'Deep performance analysis with trend charts, cutoff gap tracking, and score predictions', icon: BarChart3, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
-  { title: 'Smart Goal Tracking', description: 'AI suggests goals based on your weak areas and upcoming exam schedule', icon: Target, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
-  { title: 'Priority Support', description: 'Get faster responses and dedicated support for your exam preparation journey', icon: Shield, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+  { title: 'AI-Powered Insights', description: 'Get personalized recommendations based on your performance patterns and study habits', icon: BrainCircuit, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', gradient: 'from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20' },
+  { title: 'Advanced Analytics', description: 'Deep performance analysis with trend charts, cutoff gap tracking, and score predictions', icon: BarChart3, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300', gradient: 'from-teal-50 to-cyan-50 dark:from-teal-950/20 dark:to-cyan-950/20' },
+  { title: 'Smart Goal Tracking', description: 'AI suggests goals based on your weak areas and upcoming exam schedule', icon: Target, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', gradient: 'from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20' },
+  { title: 'Priority Support', description: 'Get faster responses and dedicated support for your exam preparation journey', icon: Shield, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300', gradient: 'from-rose-50 to-pink-50 dark:from-rose-950/20 dark:to-pink-950/20' },
 ];
 
 const faqs = [
@@ -117,38 +123,83 @@ const faqs = [
   { q: 'What happens to my data if I downgrade?', a: 'Your data is always yours. If you downgrade, your data is preserved but some features may become read-only. You can export all your data at any time.' },
 ];
 
+const testimonials = [
+  {
+    name: 'Priya Sharma',
+    exam: 'CAT 2024',
+    avatar: 'PS',
+    quote: 'The weakness heatmap helped me identify exactly where I was losing marks. Improved my score by 15% in just 2 months!',
+    rating: 5,
+    color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+  },
+  {
+    name: 'Rahul Patel',
+    exam: 'GATE CS 2025',
+    avatar: 'RP',
+    quote: 'AI-powered insights are a game changer. It predicted my weak areas before I even realized them. Totally worth the Pro plan.',
+    rating: 5,
+    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300',
+  },
+  {
+    name: 'Ananya Gupta',
+    exam: 'UPSC Prelims',
+    avatar: 'AG',
+    quote: 'The study streak feature kept me consistent for 90 days straight. Premium analytics helped me track every section of my preparation.',
+    rating: 5,
+    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+  },
+];
+
 export default function UpgradePlanPage() {
   const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly');
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h2 className="text-xl font-bold">Upgrade to Pro</h2>
-        <Button variant="outline" className="gap-2" onClick={() => toast.info('Sales contact dialog would open')}>
-          <HelpCircle className="size-4" /> Contact Sales
-        </Button>
-      </div>
+      {/* Header with Gradient */}
+      <Card className="rounded-2xl overflow-hidden border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30">
+        <div className="relative px-6 py-6 sm:px-8">
+          <div className="absolute inset-0 opacity-20 overflow-hidden">
+            <div className="absolute -top-8 -right-8 size-40 rounded-full bg-emerald-300/30 blur-2xl" />
+            <div className="absolute -bottom-8 -left-8 size-48 rounded-full bg-teal-300/30 blur-2xl" />
+          </div>
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-sm">
+                  <Gem className="size-5 text-white drop-shadow-sm" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold">Upgrade to Pro</h2>
+                  <p className="text-xs text-muted-foreground">Unlock premium features to boost your exam preparation</p>
+                </div>
+              </div>
+            </div>
+            <Button variant="outline" className="gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.info('Sales contact dialog would open')}>
+              <HelpCircle className="size-4" /> Contact Sales
+            </Button>
+          </div>
+        </div>
+      </Card>
 
       {/* Billing Toggle */}
       <div className="flex items-center justify-center gap-4">
-        <span className={cn('text-sm font-medium', billing === 'monthly' ? 'text-foreground' : 'text-muted-foreground')}>Monthly</span>
+        <span className={cn('text-sm font-medium transition-colors', billing === 'monthly' ? 'text-foreground' : 'text-muted-foreground')}>Monthly</span>
         <Button
           variant="outline"
           size="sm"
           className={cn(
-            'relative px-8 gap-2',
-            billing === 'yearly' && 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 hover:text-white',
+            'relative px-6 gap-2 rounded-full transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
+            billing === 'yearly' ? 'bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 hover:text-white shadow-md' : '',
           )}
           onClick={() => setBilling(billing === 'monthly' ? 'yearly' : 'monthly')}
         >
           <Crown className="size-3.5" />
           {billing === 'yearly' ? 'Yearly' : 'Switch to Yearly'}
           {billing === 'monthly' && (
-            <Badge className="ml-1 bg-amber-100 text-amber-700 text-[10px] dark:bg-amber-900/40 dark:text-amber-300">Save 20%</Badge>
+            <Badge className="ml-1 bg-amber-100 text-amber-700 text-[10px] dark:bg-amber-900/40 dark:text-amber-300 animate-pulse font-semibold">Save 20%</Badge>
           )}
         </Button>
-        <span className={cn('text-sm font-medium', billing === 'yearly' ? 'text-foreground' : 'text-muted-foreground')}>Yearly</span>
+        <span className={cn('text-sm font-medium transition-colors', billing === 'yearly' ? 'text-foreground' : 'text-muted-foreground')}>Yearly</span>
       </div>
 
       {/* Plan Cards */}
@@ -156,60 +207,94 @@ export default function UpgradePlanPage() {
         {plans.map((plan) => {
           const price = billing === 'monthly' ? plan.priceMonthly : plan.priceYearly;
           const isPremium = plan.name === 'Premium';
+          const isPro = plan.name === 'Pro';
           return (
             <Card key={plan.name} className={cn(
-              'relative flex flex-col',
-              isPremium && 'border-emerald-500 border-2 shadow-lg',
+              'relative flex flex-col rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1',
+              plan.current ? 'border-muted' : '',
+              isPremium ? `border-2 ${plan.borderColor} shadow-lg ring-1 ring-emerald-500/20` : '',
+              isPro ? `border-2 ${plan.borderColor} ring-1 ring-amber-500/20` : '',
             )}>
+              {/* Colored Top Bar */}
+              <div className={cn('h-1.5 bg-gradient-to-r', plan.gradientFrom, plan.gradientTo)} />
+
+              {/* Badge */}
               {plan.badge && (
                 <div className={cn(
-                  'absolute -top-3 left-1/2 -translate-x-1/2',
-                  isPremium ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground',
-                  'text-xs font-medium px-3 py-1 rounded-full',
+                  'absolute -top-0 left-1/2 -translate-x-1/2 translate-y-1',
+                  isPremium ? 'bg-emerald-600 text-white shadow-md' :
+                  isPro ? 'bg-amber-500 text-white shadow-md' :
+                  'bg-muted text-muted-foreground',
+                  'text-[10px] font-bold px-3 py-1 rounded-b-lg uppercase tracking-wide',
                 )}>
                   {plan.badge}
                 </div>
               )}
+
               <CardHeader className="pb-2 pt-6 text-center">
-                <CardTitle className="text-lg">
-                  {plan.name === 'Premium' && <Crown className="size-5 inline mr-1.5 text-emerald-600" />}
-                  {plan.name === 'Pro' && <Sparkles className="size-5 inline mr-1.5 text-amber-500" />}
+                <CardTitle className="text-lg flex items-center justify-center gap-1.5">
+                  {isPremium && <Crown className="size-5 text-emerald-600" />}
+                  {isPro && <Sparkles className="size-5 text-amber-500" />}
+                  {plan.name === 'Free' && <Star className="size-5 text-gray-500" />}
                   {plan.name}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">{plan.tagline}</p>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col">
+                {/* Price Display */}
                 <div className="text-center my-4">
-                  <span className="text-4xl font-bold">₹{price}</span>
-                  <span className="text-sm text-muted-foreground">/{billing === 'monthly' ? 'mo' : 'mo, billed yearly'}</span>
-                  {billing === 'yearly' && plan.priceYearly < plan.priceMonthly && (
-                    <p className="text-xs text-emerald-600 mt-1">Save ₹{(plan.priceMonthly - plan.priceYearly) * 12}/year</p>
+                  {price === 0 ? (
+                    <div>
+                      <span className="text-4xl font-bold">Free</span>
+                      <p className="text-sm text-muted-foreground mt-1">Forever free</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <span className="text-4xl font-bold tabular-nums">₹{price}</span>
+                      <span className="text-sm text-muted-foreground">/{billing === 'monthly' ? 'mo' : 'mo, billed yearly'}</span>
+                      {billing === 'yearly' && plan.priceYearly < plan.priceMonthly && (
+                        <div className="inline-flex items-center gap-1 mt-1">
+                          <Badge className="bg-emerald-100 text-emerald-700 text-[10px] dark:bg-emerald-900/40 dark:text-emerald-300 font-semibold">
+                            Save ₹{(plan.priceMonthly - plan.priceYearly) * 12}/year
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
                 <Separator className="mb-4" />
 
+                {/* Features */}
                 <div className="space-y-2.5 flex-1">
                   {plan.features.map((f) => (
-                    <div key={f.label} className="flex items-center gap-2">
+                    <div key={f.label} className={cn(
+                      'flex items-center gap-2.5 p-1.5 rounded-lg transition-colors',
+                      f.included ? 'hover:bg-muted/50' : '',
+                    )}>
                       {f.included ? (
-                        <Check className="size-4 text-emerald-600 shrink-0" />
+                        <div className="flex size-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0">
+                          <Check className="size-3" />
+                        </div>
                       ) : (
-                        <X className="size-4 text-muted-foreground/40 shrink-0" />
+                        <div className="flex size-5 items-center justify-center rounded-full bg-muted text-muted-foreground/40 shrink-0">
+                          <X className="size-3" />
+                        </div>
                       )}
-                      <span className={cn('text-sm', f.included ? 'text-foreground' : 'text-muted-foreground/60')}>
+                      <span className={cn('text-sm', f.included ? 'text-foreground' : 'text-muted-foreground/50')}>
                         {f.label}
                       </span>
                     </div>
                   ))}
                 </div>
 
+                {/* CTA Button */}
                 <Button
                   className={cn(
-                    'mt-6 w-full',
-                    plan.current ? 'bg-muted text-muted-foreground cursor-default' : '',
-                    isPremium && !plan.current ? 'bg-emerald-600 hover:bg-emerald-700' : '',
-                    !isPremium && !plan.current ? 'bg-foreground hover:bg-foreground/90' : '',
+                    'mt-6 w-full transition-all duration-200 hover:-translate-y-0.5',
+                    plan.current ? 'bg-muted text-muted-foreground cursor-default hover:bg-muted hover:-translate-y-0' : '',
+                    isPremium && !plan.current ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md' : '',
+                    isPro && !plan.current ? 'bg-foreground hover:bg-foreground/90 hover:shadow-md' : '',
                   )}
                   onClick={() => {
                     if (plan.current) return;
@@ -218,6 +303,7 @@ export default function UpgradePlanPage() {
                   disabled={plan.current}
                 >
                   {plan.current ? 'Current Plan' : `Upgrade to ${plan.name}`}
+                  {!plan.current && <ArrowRight className="size-4 ml-1" />}
                 </Button>
               </CardContent>
             </Card>
@@ -226,29 +312,37 @@ export default function UpgradePlanPage() {
       </div>
 
       {/* Money-Back Guarantee */}
-      <Card className="border-emerald-500/50 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+      <Card className="rounded-2xl border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30 overflow-hidden">
+        <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
         <CardContent className="p-5 flex items-center gap-4">
-          <div className="flex size-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 shrink-0 dark:bg-emerald-900/40">
+          <div className="flex size-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 shrink-0 dark:bg-emerald-900/40 shadow-sm">
             <Shield className="size-6" />
           </div>
-          <div>
-            <h4 className="font-semibold">7-Day Money-Back Guarantee</h4>
+          <div className="flex-1">
+            <h4 className="font-bold">7-Day Money-Back Guarantee</h4>
             <p className="text-sm text-muted-foreground">Not satisfied? Get a full refund within 7 days. No questions asked.</p>
           </div>
+          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs font-semibold shrink-0">100% Secure</Badge>
         </CardContent>
       </Card>
 
       {/* Compare Plans Table */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Compare Plans</h3>
-        <Card>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+          <BarChart3 className="size-4" /> Compare Plans
+        </h3>
+        <Card className="rounded-2xl overflow-hidden">
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left text-sm font-medium text-muted-foreground p-3">Feature</th>
+                <tr className="border-b bg-muted/30">
+                  <th className="text-left text-sm font-semibold text-muted-foreground p-4">Feature</th>
                   {plans.map((p) => (
-                    <th key={p.name} className="text-center text-sm font-semibold p-3">
+                    <th key={p.name} className={cn(
+                      'text-center text-sm font-bold p-4',
+                      p.name === 'Premium' ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20' :
+                      p.name === 'Pro' ? 'text-amber-600 bg-amber-50/50 dark:bg-amber-950/20' : '',
+                    )}>
                       {p.name}
                     </th>
                   ))}
@@ -256,16 +350,27 @@ export default function UpgradePlanPage() {
               </thead>
               <tbody>
                 {plans[0].features.map((f, i) => (
-                  <tr key={i} className="border-b last:border-b-0">
-                    <td className="text-sm p-3 text-muted-foreground">{f.label}</td>
+                  <tr key={i} className={cn(
+                    'border-b last:border-b-0 transition-colors hover:bg-muted/30',
+                    i % 2 === 1 && 'bg-muted/20',
+                  )}>
+                    <td className="text-sm p-4 text-muted-foreground">{f.label}</td>
                     {plans.map((p) => {
                       const included = p.features[i]?.included;
                       return (
-                        <td key={p.name} className="text-center p-3">
+                        <td key={p.name} className={cn(
+                          'text-center p-4',
+                          p.name === 'Premium' && included && 'bg-emerald-50/30 dark:bg-emerald-950/10',
+                          p.name === 'Pro' && included && 'bg-amber-50/30 dark:bg-amber-950/10',
+                        )}>
                           {included ? (
-                            <Check className="size-4 text-emerald-600 mx-auto" />
+                            <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 mx-auto">
+                              <Check className="size-3.5" />
+                            </div>
                           ) : (
-                            <X className="size-4 text-muted-foreground/40 mx-auto" />
+                            <div className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground/40 mx-auto">
+                              <X className="size-3.5" />
+                            </div>
                           )}
                         </td>
                       );
@@ -278,21 +383,26 @@ export default function UpgradePlanPage() {
         </Card>
       </div>
 
-      {/* Why Upgrade */}
+      {/* Benefits */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Why Upgrade?</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Zap className="size-4" /> Why Upgrade?
+        </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {benefits.map((b) => {
             const Icon = b.icon;
             return (
-              <Card key={b.title}>
-                <CardContent className="p-4 flex items-start gap-3">
-                  <div className={cn('flex size-10 items-center justify-center rounded-lg shrink-0', b.color)}>
-                    <Icon className="size-5" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">{b.title}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{b.description}</p>
+              <Card key={b.title} className={cn('rounded-2xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200')}>
+                <div className={cn('h-1 bg-gradient-to-r opacity-50', b.gradient.replace(/from-/, 'from-emerald-400/').replace(/to-/, 'to-teal-400/'))} />
+                <CardContent className="p-5">
+                  <div className="flex items-start gap-4">
+                    <div className={cn('flex size-12 items-center justify-center rounded-xl shrink-0 shadow-sm', b.color)}>
+                      <Icon className="size-6" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-sm">{b.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{b.description}</p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -301,20 +411,54 @@ export default function UpgradePlanPage() {
         </div>
       </div>
 
+      {/* Testimonials */}
+      <div>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+          <Star className="size-4" /> What Students Say
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {testimonials.map((t) => (
+            <Card key={t.name} className="rounded-2xl hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <CardContent className="p-5">
+                <Quote className="size-6 text-emerald-300 dark:text-emerald-700 mb-3" />
+                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{t.quote}</p>
+                <div className="flex items-center gap-3">
+                  <div className={cn('flex size-9 items-center justify-center rounded-full text-xs font-bold', t.color)}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{t.name}</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {Array.from({ length: t.rating }).map((_, i) => (
+                        <Star key={i} className="size-3 text-amber-500 fill-amber-500" />
+                      ))}
+                      <span className="text-[10px] text-muted-foreground ml-1">{t.exam}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+
       {/* FAQ */}
       <div>
-        <h3 className="text-lg font-semibold mb-4">Frequently Asked Questions</h3>
-        <Card>
+        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+          <HelpCircle className="size-4" /> Frequently Asked Questions
+        </h3>
+        <Card className="rounded-xl">
           <CardContent className="p-0">
             <Accordion type="single" collapsible className="w-full">
               {faqs.map((faq, i) => (
-                <AccordionItem key={i} value={`plan-faq-${i}`}>
-                  <AccordionTrigger className="px-5 text-sm font-medium">
+                <AccordionItem key={i} value={`plan-faq-${i}`} className="px-5">
+                  <AccordionTrigger className="text-sm font-medium hover:no-underline py-4 hover:text-emerald-600 transition-colors">
                     {faq.q}
                   </AccordionTrigger>
-                  <AccordionContent className="px-5 text-sm text-muted-foreground pb-4">
+                  <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed">
                     {faq.a}
                   </AccordionContent>
+                  {i < faqs.length - 1 && <Separator />}
                 </AccordionItem>
               ))}
             </Accordion>

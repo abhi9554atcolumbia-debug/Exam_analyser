@@ -592,7 +592,7 @@ export default function DocumentsPage() {
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">
                     {search || categoryFilter || yearFilter
-                      ? 'No documents match your filters'
+                      ? 'No documents match your search'
                       : 'No documents yet'}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground/70">

@@ -4,7 +4,8 @@ import { useState } from 'react';
 import {
   User, Mail, Phone, MapPin, Camera, Pencil, Download, HardDrive,
   BookOpen, Trophy, Star, Clock, BrainCircuit, Target, Shield, Plus,
-  Lock, MonitorSmartphone, Trash2, BarChart3,
+  Lock, MonitorSmartphone, Trash2, BarChart3, Crown, GraduationCap,
+  Flame, Calendar, Award, Sparkles, ChevronRight, Zap,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useNavigationStore } from '@/store/navigation';
 
 const achievementIcons = [Trophy, Star, BarChart3, Shield, BookOpen];
 const achievementColors = [
@@ -37,9 +39,41 @@ const achievementColors = [
   'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
   'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
 ];
+const achievementBorderColors = [
+  'border-l-amber-500',
+  'border-l-emerald-500',
+  'border-l-teal-500',
+  'border-l-rose-500',
+  'border-l-violet-500',
+];
+
+const examFocusConfig = [
+  { label: 'Primary Exam', icon: GraduationCap, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  { label: 'Secondary Exam', icon: Target, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
+  { label: 'Target Year', icon: Calendar, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  { label: 'Stage', icon: BarChart3, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+  { label: 'Language', icon: Sparkles, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+  { label: 'Study Time', icon: Clock, color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300' },
+];
+
+const studyPrefConfig = [
+  { label: 'Preferred Time', icon: Sun, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  { label: 'Hours/Day', icon: Clock, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+  { label: 'Learning Mode', icon: BrainCircuit, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+  { label: 'Weekend Study', icon: Flame, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
+];
+
+function Sun(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="4" /><path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+    </svg>
+  );
+}
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigationStore((s) => s.navigate);
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState({
     name: '', email: '', phone: '', location: '',
@@ -87,6 +121,12 @@ export default function ProfilePage() {
     { name: 'GRE', type: 'secondary' },
   ];
 
+  const achievementData = achievements || Array.from({ length: 5 }, (_, i) => ({
+    label: ['First Exam', '3-Day Streak', 'Score 80+', '5 Goals', 'Reflection Pro'][i],
+    sub: ['Completed your first exam', 'Studied 3 days in a row', 'Scored above 80%', 'Set 5 goals', 'Wrote 5 reflections'][i],
+    unlocked: true,
+  }));
+
   if (userLoading) {
     return (
       <div className="space-y-6">
@@ -103,175 +143,225 @@ export default function ProfilePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">My Profile</h2>
-        <Button variant="outline" className="gap-2" onClick={openEdit}>
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-sm">
+            <User className="size-5 text-white drop-shadow-sm" />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold">My Profile</h2>
+            <p className="text-xs text-muted-foreground">Manage your personal information and preferences</p>
+          </div>
+        </div>
+        <Button variant="outline" className="gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" onClick={openEdit}>
           <Pencil className="size-4" /> Edit Profile
         </Button>
       </div>
 
-      {/* User Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            <div className="relative">
-              <Avatar className="size-20">
+      {/* Profile Header with Cover Banner */}
+      <Card className="overflow-hidden rounded-2xl">
+        {/* Cover/Banner Area */}
+        <div className="relative h-32 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 overflow-hidden">
+          <div className="absolute inset-0 opacity-20">
+            <div className="absolute -top-4 -right-4 size-32 rounded-full bg-white/20 blur-xl" />
+            <div className="absolute -bottom-8 -left-8 size-40 rounded-full bg-white/15 blur-xl" />
+            <div className="absolute top-4 left-1/2 size-24 rounded-full bg-white/10 blur-lg" />
+          </div>
+        </div>
+        {/* User Info Overlay */}
+        <CardContent className="p-6 pt-0">
+          <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5 -mt-12">
+            <div className="relative group">
+              <Avatar className="size-24 ring-4 ring-white dark:ring-card shadow-lg">
                 <AvatarImage src={user?.avatar || undefined} alt={user?.name} />
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xl dark:bg-emerald-900/50 dark:text-emerald-300">
+                <AvatarFallback className="bg-emerald-100 text-emerald-700 text-2xl dark:bg-emerald-900/50 dark:text-emerald-300">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <button className="absolute -bottom-1 -right-1 flex size-7 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700 transition-colors">
+              <button className="absolute bottom-0 right-0 flex size-8 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md hover:bg-emerald-700 hover:scale-110 transition-all duration-200">
                 <Camera className="size-3.5" />
               </button>
             </div>
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
-              <div className="flex items-center gap-2">
-                <User className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Name</p>
-                  <p className="font-semibold">{user?.name || '—'}</p>
-                </div>
+            <div className="flex-1 pb-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-bold">{user?.name || '—'}</h3>
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px] font-semibold uppercase tracking-wide">
+                  {user?.role || 'User'}
+                </Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p className="font-semibold">{user?.email || '—'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Phone className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <p className="font-semibold">{user?.phone || '—'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <MapPin className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Location</p>
-                  <p className="font-semibold">{user?.location || '—'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Target className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Role</p>
-                  <p className="font-semibold capitalize">{user?.role || '—'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="size-4 text-muted-foreground" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Member Since</p>
-                  <p className="font-semibold">{user?.memberSince ? format(new Date(user.memberSince), 'MMM d, yyyy') : '—'}</p>
-                </div>
+              <div className="flex items-center gap-4 mt-1 flex-wrap">
+                <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                  <Mail className="size-3.5" /> {user?.email || '—'}
+                </span>
+                {user?.memberSince && (
+                  <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="size-3.5" /> Joined {format(new Date(user.memberSince), 'MMM d, yyyy')}
+                  </span>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Contact Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
+            {[
+              { icon: Phone, label: 'Phone', value: user?.phone },
+              { icon: MapPin, label: 'Location', value: user?.location },
+              { icon: Target, label: 'Role', value: user?.role },
+              { icon: Award, label: 'Plan', value: user?.plan || 'Free' },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-muted/50 hover:bg-muted/80 transition-colors">
+                  <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0">
+                    <Icon className="size-4" />
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{item.label}</p>
+                    <p className="text-sm font-medium capitalize">{item.value || '—'}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
 
+      {/* Section Divider */}
+      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           {/* My Exam Focus */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <BookOpen className="size-4 text-emerald-600" /> My Exam Focus
+                <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  <BookOpen className="size-4" />
+                </div>
+                My Exam Focus
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {[
-                  { label: 'Primary Exam', value: user?.primaryExam },
-                  { label: 'Secondary Exam', value: user?.secondaryExam },
-                  { label: 'Target Year', value: user?.targetYear },
-                  { label: 'Stage', value: user?.currentStage },
-                  { label: 'Language', value: user?.language },
-                  { label: 'Study Time', value: user?.studyTime },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                    <p className="font-medium text-sm capitalize">{item.value || '—'}</p>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {examFocusConfig.map((item) => {
+                  const Icon = item.icon;
+                  const valueKey = item.label.toLowerCase().replace(/ /g, '') as keyof UserProfile;
+                  const value = (user as Record<string, string | undefined>)?.[
+                    item.label === 'Primary Exam' ? 'primaryExam' :
+                    item.label === 'Secondary Exam' ? 'secondaryExam' :
+                    item.label === 'Target Year' ? 'targetYear' :
+                    item.label === 'Stage' ? 'currentStage' :
+                    item.label === 'Language' ? 'language' : 'studyTime'
+                  ];
+                  return (
+                    <div key={item.label} className="p-3 rounded-xl border bg-card hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200">
+                      <div className={cn('flex size-8 items-center justify-center rounded-lg mb-2', item.color)}>
+                        <Icon className="size-4" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{item.label}</p>
+                      <p className="font-semibold text-sm capitalize mt-0.5">{value || '—'}</p>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
 
           {/* Account Settings */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Shield className="size-4 text-emerald-600" /> Account Settings
+                <div className="flex size-7 items-center justify-center rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                  <Shield className="size-4" />
+                </div>
+                Account Settings
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <Button variant="outline" className="gap-2 justify-start text-sm" onClick={() => toast.info('Change password dialog would open')}>
-                  <Lock className="size-4" /> Change Password
-                </Button>
-                <Button variant="outline" className="gap-2 justify-start text-sm" onClick={() => toast.info('Update email dialog would open')}>
-                  <Mail className="size-4" /> Update Email
-                </Button>
-                <Button variant="outline" className="gap-2 justify-start text-sm" onClick={() => toast.info('Update phone dialog would open')}>
-                  <Phone className="size-4" /> Update Phone
-                </Button>
-                <Button variant="outline" className="gap-2 justify-start text-sm" onClick={() => toast.info('Manage devices dialog would open')}>
-                  <MonitorSmartphone className="size-4" /> Manage Devices
-                </Button>
-                <Button variant="outline" className="gap-2 justify-start text-sm text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={() => toast.error('Account deletion requires confirmation')}>
-                  <Trash2 className="size-4" /> Delete Account
-                </Button>
+                {[
+                  { icon: Lock, label: 'Change Password', action: () => toast.info('Change password dialog would open'), className: '' },
+                  { icon: Mail, label: 'Update Email', action: () => toast.info('Update email dialog would open'), className: '' },
+                  { icon: Phone, label: 'Update Phone', action: () => toast.info('Update phone dialog would open'), className: '' },
+                  { icon: MonitorSmartphone, label: 'Manage Devices', action: () => toast.info('Manage devices dialog would open'), className: '' },
+                  { icon: Trash2, label: 'Delete Account', action: () => toast.error('Account deletion requires confirmation'), className: 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Button key={item.label} variant="outline" className={cn('gap-2 justify-start text-sm h-auto py-3 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200', item.className)} onClick={item.action}>
+                      <Icon className="size-4" /> {item.label}
+                    </Button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
 
           {/* Progress Summary */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <BarChart3 className="size-4 text-emerald-600" /> Progress Summary
+                <div className="flex size-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+                  <BarChart3 className="size-4" />
+                </div>
+                Progress Summary
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {[
-                  { label: 'Exams Tracked', value: progress?.examsTracked ?? 0 },
-                  { label: 'Attempted', value: progress?.examsAttempted ?? 0 },
-                  { label: 'Qualified', value: progress?.examsQualified ?? 0 },
-                  { label: 'Avg Score', value: progress?.averageScore ?? 0 },
-                  { label: 'Best Score', value: progress?.bestScore ?? 0 },
-                ].map((item) => (
-                  <div key={item.label} className="text-center">
-                    <p className="text-2xl font-bold text-emerald-600">{item.value}</p>
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                  </div>
-                ))}
+                  { label: 'Exams Tracked', value: progress?.examsTracked ?? 0, icon: GraduationCap, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+                  { label: 'Attempted', value: progress?.examsAttempted ?? 0, icon: Zap, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+                  { label: 'Qualified', value: progress?.examsQualified ?? 0, icon: Trophy, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300' },
+                  { label: 'Avg Score', value: progress?.averageScore ?? 0, icon: BarChart3, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+                  { label: 'Best Score', value: progress?.bestScore ?? 0, icon: Star, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300' },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="text-center p-3 rounded-xl bg-muted/50 hover:bg-muted/80 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200">
+                      <div className={cn('flex size-8 items-center justify-center rounded-lg mx-auto mb-2', item.color)}>
+                        <Icon className="size-4" />
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{item.value}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{item.label}</p>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
 
           {/* Achievements */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Trophy className="size-4 text-amber-500" /> Achievements
+                <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                  <Trophy className="size-4" />
+                </div>
+                Achievements
+                <Badge variant="secondary" className="text-[10px] ml-auto font-semibold">{achievementData.length} Unlocked</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(achievements || Array.from({ length: 5 }, (_, i) => ({ label: ['First Exam', '3-Day Streak', 'Score 80+', '5 Goals', 'Reflection Pro'][i], sub: ['Completed your first exam', 'Studied 3 days in a row', 'Scored above 80%', 'Set 5 goals', 'Wrote 5 reflections'][i] }))).map((a, i) => {
+                {achievementData.map((a, i) => {
                   const Icon = achievementIcons[i % achievementIcons.length];
+                  const colorClass = achievementColors[i % achievementColors.length];
+                  const borderClass = achievementBorderColors[i % achievementBorderColors.length];
                   return (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
-                      <div className={cn('flex size-10 items-center justify-center rounded-lg shrink-0', achievementColors[i % achievementColors.length])}>
+                    <div key={i} className={cn(
+                      'flex items-center gap-3 p-3 rounded-xl border-l-[3px] bg-card hover:shadow-md hover:-translate-y-0.5 transition-all duration-200',
+                      borderClass,
+                    )}>
+                      <div className={cn('flex size-10 items-center justify-center rounded-xl shrink-0 shadow-sm', colorClass)}>
                         <Icon className="size-5" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium">{a.label}</p>
-                        <p className="text-xs text-muted-foreground">{a.sub}</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold">{a.label}</p>
+                        <p className="text-xs text-muted-foreground truncate">{a.sub}</p>
+                      </div>
+                      <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0">
+                        <Sparkles className="size-3" />
                       </div>
                     </div>
                   );
@@ -281,25 +371,28 @@ export default function ProfilePage() {
           </Card>
 
           {/* Exam Interests */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <Target className="size-4 text-teal-600" /> Exam Interests
+                <div className="flex size-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
+                  <Target className="size-4" />
+                </div>
+                Exam Interests
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
                 {examInterests.map((e) => (
                   <Badge key={e.name} variant={e.type === 'primary' ? 'default' : 'secondary'} className={cn(
-                    e.type === 'primary' ? 'bg-emerald-600 hover:bg-emerald-700' : '',
-                    'gap-1.5',
+                    e.type === 'primary' ? 'bg-emerald-600 hover:bg-emerald-700' : 'hover:bg-muted',
+                    'gap-1.5 py-1.5 px-3 transition-all duration-200 hover:shadow-sm',
                   )}>
                     {e.type === 'primary' && <Star className="size-3" />}
                     {e.name}
                     <span className="text-[10px] opacity-70 capitalize">{e.type}</span>
                   </Badge>
                 ))}
-                <Button variant="outline" size="sm" className="gap-1 h-7 text-xs" onClick={() => toast.info('Add exam dialog would open')}>
+                <Button variant="outline" size="sm" className="gap-1 h-7 text-xs hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.info('Add exam dialog would open')}>
                   <Plus className="size-3" /> Add Exam
                 </Button>
               </div>
@@ -307,45 +400,57 @@ export default function ProfilePage() {
           </Card>
 
           {/* Study Preferences */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <BrainCircuit className="size-4 text-violet-500" /> Study Preferences
+                <div className="flex size-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                  <BrainCircuit className="size-4" />
+                </div>
+                Study Preferences
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Preferred Time', value: user?.preferredTime || 'Morning' },
-                  { label: 'Hours/Day', value: user?.hoursPerDay || '4-6 hrs' },
-                  { label: 'Learning Mode', value: user?.learningMode || 'Visual' },
-                  { label: 'Weekend Study', value: user?.weekendStudy || 'Yes' },
-                ].map((item) => (
-                  <div key={item.label}>
-                    <p className="text-xs text-muted-foreground">{item.label}</p>
-                    <p className="font-medium text-sm">{item.value}</p>
-                  </div>
-                ))}
+                  { label: 'Preferred Time', value: user?.preferredTime || 'Morning', icon: studyPrefConfig[0].icon, color: studyPrefConfig[0].color },
+                  { label: 'Hours/Day', value: user?.hoursPerDay || '4-6 hrs', icon: studyPrefConfig[1].icon, color: studyPrefConfig[1].color },
+                  { label: 'Learning Mode', value: user?.learningMode || 'Visual', icon: studyPrefConfig[2].icon, color: studyPrefConfig[2].color },
+                  { label: 'Weekend Study', value: user?.weekendStudy || 'Yes', icon: studyPrefConfig[3].icon, color: studyPrefConfig[3].color },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="p-3 rounded-xl border bg-card hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200">
+                      <div className={cn('flex size-8 items-center justify-center rounded-lg mb-2', item.color)}>
+                        <Icon className="size-4" />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground uppercase tracking-wide">{item.label}</p>
+                      <p className="font-semibold text-sm mt-0.5">{item.value}</p>
+                    </div>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
 
           {/* Data & Backup */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <HardDrive className="size-4 text-emerald-600" /> Data &amp; Backup
+                <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                  <HardDrive className="size-4" />
+                </div>
+                Data &amp; Backup
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                <Button variant="outline" className="gap-2 text-sm" onClick={() => toast.success('Export started')}>
-                  <Download className="size-4" /> Export
+                <Button variant="outline" className="gap-2 text-sm hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.success('Export started')}>
+                  <Download className="size-4" /> Export Data
                 </Button>
-                <Button variant="outline" className="gap-2 text-sm" onClick={() => toast.success('Download started')}>
-                  <Download className="size-4" /> Download
+                <Button variant="outline" className="gap-2 text-sm hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.success('Download started')}>
+                  <Download className="size-4" /> Download Backup
                 </Button>
-                <Button className="gap-2 text-sm bg-emerald-600 hover:bg-emerald-700" onClick={() => toast.success('Backup created!')}>
+                <Button className="gap-2 text-sm bg-emerald-600 hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.success('Backup created!')}>
                   <HardDrive className="size-4" /> Backup Now
                 </Button>
               </div>
@@ -356,37 +461,61 @@ export default function ProfilePage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Plan Info */}
-          <Card className="border-emerald-500/50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+          <Card className="border-emerald-500/50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
             <CardContent className="p-5">
-              <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Current Plan</p>
-              <p className="text-xl font-bold mt-1 capitalize">{user?.plan || 'Free'}</p>
+              <div className="flex items-center gap-2 mb-1">
+                <Crown className="size-4 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Current Plan</p>
+              </div>
+              <p className="text-xl font-bold capitalize">{user?.plan || 'Free'}</p>
               <p className="text-xs text-muted-foreground mt-1">Upgrade for advanced analytics</p>
-              <Button className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-sm" onClick={() => toast.info('Upgrade page coming soon!')}>
+              <Button className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 hover:shadow-md transition-all duration-200 text-sm" onClick={() => navigate('upgrade')}>
                 Upgrade Plan
               </Button>
             </CardContent>
           </Card>
 
           {/* Quick Stats */}
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Quick Stats</CardTitle>
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <BarChart3 className="size-4 text-emerald-600" /> Quick Stats
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Total Reflections</span>
-                <span className="text-sm font-semibold">{achievements?.length ?? 0}</span>
+              {[
+                { label: 'Total Reflections', value: achievements?.length ?? 0, color: '' },
+                { label: 'Best Score', value: progress?.bestScore ?? 0, color: 'text-emerald-600 dark:text-emerald-400' },
+                { label: 'Exams Qualified', value: progress?.examsQualified ?? 0, color: 'text-teal-600 dark:text-teal-400' },
+              ].map((item, i) => (
+                <div key={item.label}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{item.label}</span>
+                    <span className={cn('text-sm font-bold tabular-nums', item.color)}>{item.value}</span>
+                  </div>
+                  {i < 2 && <Separator className="mt-3" />}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Account Health */}
+          <Card className="rounded-2xl border-emerald-500/30">
+            <CardContent className="p-5">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 shrink-0">
+                  <Shield className="size-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Profile Complete</p>
+                  <p className="text-xs text-muted-foreground">Keep your profile updated for best experience</p>
+                </div>
               </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Best Score</span>
-                <span className="text-sm font-semibold text-emerald-600">{progress?.bestScore ?? 0}</span>
+              <div className="mt-3 h-2 bg-muted rounded-full overflow-hidden">
+                <div className="h-full w-3/4 bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" />
               </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Exams Qualified</span>
-                <span className="text-sm font-semibold text-teal-600">{progress?.examsQualified ?? 0}</span>
-              </div>
+              <p className="text-[11px] text-muted-foreground mt-1.5">75% complete</p>
             </CardContent>
           </Card>
         </div>
@@ -394,89 +523,117 @@ export default function ProfilePage() {
 
       {/* Edit Profile Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Profile</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                <Pencil className="size-4" />
+              </div>
+              Edit Profile
+            </DialogTitle>
             <DialogDescription>Update your personal information and exam preferences</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2 max-h-[60vh] overflow-y-auto pr-1">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Name *</Label>
-                <Input className="mt-1.5" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
+            {/* Personal Info Section */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <User className="size-3" /> Personal Information
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Name *</Label>
+                  <Input className="mt-1.5" value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Email *</Label>
+                  <Input type="email" className="mt-1.5" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
               </div>
-              <div>
-                <Label>Email *</Label>
-                <Input type="email" className="mt-1.5" value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label>Phone</Label>
+                  <Input className="mt-1.5" value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Location</Label>
+                  <Input className="mt-1.5" value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))} />
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Phone</Label>
-                <Input className="mt-1.5" value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Location</Label>
-                <Input className="mt-1.5" value={form.location} onChange={(e) => setForm(f => ({ ...f, location: e.target.value }))} />
-              </div>
-            </div>
+
             <Separator />
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Primary Exam</Label>
-                <Input className="mt-1.5" placeholder="e.g. CAT 2025" value={form.primaryExam} onChange={(e) => setForm(f => ({ ...f, primaryExam: e.target.value }))} />
+
+            {/* Exam Preferences Section */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <GraduationCap className="size-3" /> Exam Preferences
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Primary Exam</Label>
+                  <Input className="mt-1.5" placeholder="e.g. CAT 2025" value={form.primaryExam} onChange={(e) => setForm(f => ({ ...f, primaryExam: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Secondary Exam</Label>
+                  <Input className="mt-1.5" value={form.secondaryExam} onChange={(e) => setForm(f => ({ ...f, secondaryExam: e.target.value }))} />
+                </div>
               </div>
-              <div>
-                <Label>Secondary Exam</Label>
-                <Input className="mt-1.5" value={form.secondaryExam} onChange={(e) => setForm(f => ({ ...f, secondaryExam: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div>
+                  <Label>Target Year</Label>
+                  <Input className="mt-1.5" placeholder="e.g. 2025" value={form.targetYear} onChange={(e) => setForm(f => ({ ...f, targetYear: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Stage</Label>
+                  <Select value={form.stage} onValueChange={(v) => setForm(f => ({ ...f, stage: v }))}>
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select stage" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="preparation">Preparation</SelectItem>
+                      <SelectItem value="applying">Applying</SelectItem>
+                      <SelectItem value="results">Awaiting Results</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Target Year</Label>
-                <Input className="mt-1.5" placeholder="e.g. 2025" value={form.targetYear} onChange={(e) => setForm(f => ({ ...f, targetYear: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Stage</Label>
-                <Select value={form.stage} onValueChange={(v) => setForm(f => ({ ...f, stage: v }))}>
-                  <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select stage" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="preparation">Preparation</SelectItem>
-                    <SelectItem value="applying">Applying</SelectItem>
-                    <SelectItem value="results">Awaiting Results</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Language</Label>
-                <Select value={form.language} onValueChange={(v) => setForm(f => ({ ...f, language: v }))}>
-                  <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select language" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="english">English</SelectItem>
-                    <SelectItem value="hindi">Hindi</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Study Time</Label>
-                <Select value={form.studyTime} onValueChange={(v) => setForm(f => ({ ...f, studyTime: v }))}>
-                  <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select time" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="morning">Morning</SelectItem>
-                    <SelectItem value="afternoon">Afternoon</SelectItem>
-                    <SelectItem value="evening">Evening</SelectItem>
-                    <SelectItem value="night">Night</SelectItem>
-                  </SelectContent>
-                </Select>
+
+            <Separator />
+
+            {/* Study Preferences Section */}
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <BrainCircuit className="size-3" /> Study Preferences
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Language</Label>
+                  <Select value={form.language} onValueChange={(v) => setForm(f => ({ ...f, language: v }))}>
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select language" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="english">English</SelectItem>
+                      <SelectItem value="hindi">Hindi</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Study Time</Label>
+                  <Select value={form.studyTime} onValueChange={(v) => setForm(f => ({ ...f, studyTime: v }))}>
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select time" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="morning">Morning</SelectItem>
+                      <SelectItem value="afternoon">Afternoon</SelectItem>
+                      <SelectItem value="evening">Evening</SelectItem>
+                      <SelectItem value="night">Night</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
-            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSave} disabled={updateMutation.isPending}>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 hover:shadow-md transition-all duration-200" onClick={handleSave} disabled={updateMutation.isPending}>
               {updateMutation.isPending ? 'Saving...' : 'Save Changes'}
             </Button>
           </DialogFooter>

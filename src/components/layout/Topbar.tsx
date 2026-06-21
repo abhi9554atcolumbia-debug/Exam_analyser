@@ -65,6 +65,7 @@ import {
   type Notification,
 } from '@/lib/api';
 import { toast } from 'sonner';
+import { examFormSchema } from '@/lib/validations';
 
 const PAGE_META: Record<
   string,
@@ -190,6 +191,7 @@ export function Topbar() {
     cutoff: '',
     result: 'Pending',
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const meta = PAGE_META[currentPage] ?? {
     title: 'Exam Journey Tracker',
@@ -273,10 +275,19 @@ export function Topbar() {
   });
 
   const handleExamSubmit = useCallback(() => {
-    if (!examForm.name || !examForm.examDate || !examForm.score) {
-      toast.error('Please fill in exam name, date, and score');
+    const result = examFormSchema.safeParse(examForm);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      const fieldErrors = result.error.flatten().fieldErrors;
+      for (const [key, messages] of Object.entries(fieldErrors)) {
+        if (messages && messages.length > 0) {
+          errors[key] = messages[0];
+        }
+      }
+      setFormErrors(errors);
       return;
     }
+    setFormErrors({});
     examMutation.mutate();
   }, [examForm, examMutation]);
 
@@ -375,10 +386,12 @@ export function Topbar() {
                   id="tb-exam-name"
                   placeholder="e.g. IBPS PO 2025"
                   value={examForm.name}
-                  onChange={(e) =>
-                    setExamForm((f) => ({ ...f, name: e.target.value }))
-                  }
+                  onChange={(e) => {
+                    setExamForm((f) => ({ ...f, name: e.target.value }));
+                    if (formErrors.name) setFormErrors((prev) => { const { name, ...rest } = prev; return rest; });
+                  }}
                 />
+                {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
@@ -387,10 +400,12 @@ export function Topbar() {
                     id="tb-exam-org"
                     placeholder="e.g. IBPS, SSC"
                     value={examForm.org}
-                    onChange={(e) =>
-                      setExamForm((f) => ({ ...f, org: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setExamForm((f) => ({ ...f, org: e.target.value }));
+                      if (formErrors.org) setFormErrors((prev) => { const { org, ...rest } = prev; return rest; });
+                    }}
                   />
+                  {formErrors.org && <p className="text-xs text-red-500 mt-1">{formErrors.org}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label>Category</Label>
@@ -442,10 +457,12 @@ export function Topbar() {
                     id="tb-exam-date"
                     type="date"
                     value={examForm.examDate}
-                    onChange={(e) =>
-                      setExamForm((f) => ({ ...f, examDate: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setExamForm((f) => ({ ...f, examDate: e.target.value }));
+                      if (formErrors.examDate) setFormErrors((prev) => { const { examDate, ...rest } = prev; return rest; });
+                    }}
                   />
+                  {formErrors.examDate && <p className="text-xs text-red-500 mt-1">{formErrors.examDate}</p>}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-4">
@@ -456,10 +473,12 @@ export function Topbar() {
                     type="number"
                     placeholder="0"
                     value={examForm.score}
-                    onChange={(e) =>
-                      setExamForm((f) => ({ ...f, score: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setExamForm((f) => ({ ...f, score: e.target.value }));
+                      if (formErrors.score) setFormErrors((prev) => { const { score, ...rest } = prev; return rest; });
+                    }}
                   />
+                  {formErrors.score && <p className="text-xs text-red-500 mt-1">{formErrors.score}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="tb-max-score">Max Score</Label>
@@ -468,10 +487,12 @@ export function Topbar() {
                     type="number"
                     placeholder="100"
                     value={examForm.maxScore}
-                    onChange={(e) =>
-                      setExamForm((f) => ({ ...f, maxScore: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setExamForm((f) => ({ ...f, maxScore: e.target.value }));
+                      if (formErrors.maxScore) setFormErrors((prev) => { const { maxScore, ...rest } = prev; return rest; });
+                    }}
                   />
+                  {formErrors.maxScore && <p className="text-xs text-red-500 mt-1">{formErrors.maxScore}</p>}
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="tb-cutoff">Cutoff</Label>
@@ -480,19 +501,22 @@ export function Topbar() {
                     type="number"
                     placeholder="0"
                     value={examForm.cutoff}
-                    onChange={(e) =>
-                      setExamForm((f) => ({ ...f, cutoff: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setExamForm((f) => ({ ...f, cutoff: e.target.value }));
+                      if (formErrors.cutoff) setFormErrors((prev) => { const { cutoff, ...rest } = prev; return rest; });
+                    }}
                   />
+                  {formErrors.cutoff && <p className="text-xs text-red-500 mt-1">{formErrors.cutoff}</p>}
                 </div>
               </div>
               <div className="grid gap-2">
                 <Label>Result</Label>
                 <Select
                   value={examForm.result}
-                  onValueChange={(v) =>
-                    setExamForm((f) => ({ ...f, result: v }))
-                  }
+                  onValueChange={(v) => {
+                    setExamForm((f) => ({ ...f, result: v }));
+                    if (formErrors.result) setFormErrors((prev) => { const { result, ...rest } = prev; return rest; });
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -503,6 +527,7 @@ export function Topbar() {
                     <SelectItem value="Pending">Pending</SelectItem>
                   </SelectContent>
                 </Select>
+                {formErrors.result && <p className="text-xs text-red-500 mt-1">{formErrors.result}</p>}
               </div>
             </div>
             <DialogFooter>

@@ -19,6 +19,7 @@ import {
   FileText,
   Loader2,
   SearchX,
+  Search,
   Pencil,
   Trash2,
   Download,
@@ -1025,6 +1026,7 @@ export default function ExamHistoryPage() {
   const [status, setStatus] = useState('all');
   const [sort, setSort] = useState('examDate:desc');
   const [page, setPage] = useState(1);
+  const [searchText, setSearchText] = useState('');
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState('overview');
   const [addExamOpen, setAddExamOpen] = useState(false);
@@ -1050,16 +1052,28 @@ export default function ExamHistoryPage() {
   const pagination = data?.pagination;
   const hasMore = pagination ? page < pagination.pages : false;
 
-  const grouped = useMemo(() => groupExamsByYear(exams), [exams]);
+  const filteredExams = useMemo(() => {
+    if (!searchText.trim()) return exams;
+    const term = searchText.toLowerCase().trim();
+    return exams.filter(
+      (e) =>
+        e.name.toLowerCase().includes(term) ||
+        (e.org && e.org.toLowerCase().includes(term)) ||
+        e.category.toLowerCase().includes(term) ||
+        e.stage.toLowerCase().includes(term),
+    );
+  }, [exams, searchText]);
+
+  const grouped = useMemo(() => groupExamsByYear(filteredExams), [filteredExams]);
 
   // Stats computed from all loaded exams
   const stats = useMemo(() => {
-    const total = exams.length;
-    const qualified = exams.filter((e) => e.result === 'Qualified').length;
+    const total = filteredExams.length;
+    const qualified = filteredExams.filter((e) => e.result === 'Qualified').length;
     const avgScore =
       total > 0
         ? Math.round(
-            (exams.reduce(
+            (filteredExams.reduce(
               (s, e) => s + (e.score / e.maxScore) * 100,
               0,
             ) /
@@ -1070,15 +1084,15 @@ export default function ExamHistoryPage() {
     const bestScore =
       total > 0
         ? Math.round(
-            (Math.max(...exams.map((e) => e.score / e.maxScore)) * 100) * 10,
+            (Math.max(...filteredExams.map((e) => e.score / e.maxScore)) * 100) * 10,
           ) / 10
         : 0;
     return { total, qualified, avgScore, bestScore };
-  }, [exams]);
+  }, [filteredExams]);
 
   const selectedExam = useMemo(
-    () => exams.find((e) => e.id === selectedExamId) ?? null,
-    [exams, selectedExamId],
+    () => filteredExams.find((e) => e.id === selectedExamId) ?? null,
+    [filteredExams, selectedExamId],
   );
 
   const openDetail = useCallback((examId: string) => {
@@ -1192,6 +1206,24 @@ export default function ExamHistoryPage() {
       {/* Filter Bar + View Toggle */}
       <Card>
         <CardContent className="flex flex-wrap items-center gap-3 py-3">
+          <div className="relative flex-1 min-w-[180px] max-w-[260px]">
+            <Search className="absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search exams by name, org, category..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="h-8 pl-8 text-xs"
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
           <div className="flex items-center gap-2 rounded-md bg-muted/50 px-2 py-1">
             <Filter className="size-3.5 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">Filters</span>
@@ -1301,7 +1333,7 @@ export default function ExamHistoryPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {exams.map((exam) => {
+                      {filteredExams.map((exam) => {
                         const gap = exam.cutoffGap;
                         const gapColor =
                           gap !== null && gap > 0
@@ -1470,9 +1502,11 @@ export default function ExamHistoryPage() {
               No exams found
             </p>
             <p className="mt-1 max-w-[300px] text-sm text-muted-foreground/60">
-              {category !== 'all' || year !== 'all' || status !== 'all'
-                ? 'No exams match the current filters. Try adjusting them.'
-                : "You haven't added any exams yet. Start by adding your first exam result."}
+              {searchText
+                ? 'No exams match your search. Try different keywords.'
+                : category !== 'all' || year !== 'all' || status !== 'all'
+                  ? 'No exams match the current filters. Try adjusting them.'
+                  : "You haven't added any exams yet. Start by adding your first exam result."}
             </p>
             <div className="mt-6 flex gap-3">
               <Button
