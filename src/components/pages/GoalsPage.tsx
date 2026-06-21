@@ -25,6 +25,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { goalFormSchema } from '@/lib/validations';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription,
 } from '@/components/ui/dialog';
@@ -129,7 +130,8 @@ export default function GoalsPage() {
 
   // Form state
   const [form, setForm] = useState({ title: '', priority: 'medium', linkedExam: '', subject: '', dueDate: '', description: '' });
-  const resetForm = () => setForm({ title: '', priority: 'medium', linkedExam: '', subject: '', dueDate: '', description: '' });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const resetForm = () => { setForm({ title: '', priority: 'medium', linkedExam: '', subject: '', dueDate: '', description: '' }); setFormErrors({}); };
 
   // Queries
   const { data: stats, isLoading: statsLoading } = useQuery({ queryKey: ['goalStats'], queryFn: getGoalStats });
@@ -173,8 +175,19 @@ export default function GoalsPage() {
   });
 
   const handleCreate = () => {
-    if (!form.title.trim()) { toast.error('Title is required'); return; }
-    if (!form.dueDate) { toast.error('Due date is required'); return; }
+    const result = goalFormSchema.safeParse(form);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      const fieldErrors = result.error.flatten().fieldErrors;
+      for (const [key, messages] of Object.entries(fieldErrors)) {
+        if (messages && messages.length > 0) {
+          errors[key] = messages[0];
+        }
+      }
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     createMutation.mutate({
       title: form.title,
       priority: form.priority,
@@ -299,8 +312,8 @@ export default function GoalsPage() {
               <div className="space-y-4 mt-2">
                 <div>
                   <Label htmlFor="goal-title">Title <span className="text-red-500">*</span></Label>
-                  <Input id="goal-title" className="mt-1.5" placeholder="e.g. Complete Quant chapter 5" value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))} />
-                  {!form.title.trim() && <p className="text-xs text-red-500 mt-1">Title is required</p>}
+                  <Input id="goal-title" className="mt-1.5" placeholder="e.g. Complete Quant chapter 5" value={form.title} onChange={(e) => { setForm(f => ({ ...f, title: e.target.value })); if (formErrors.title) setFormErrors(prev => { const { title, ...rest } = prev; return rest; }); }} />
+                  {formErrors.title && <p className="text-xs text-red-500 mt-1">{formErrors.title}</p>}
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -335,16 +348,18 @@ export default function GoalsPage() {
                   <div>
                     <Label htmlFor="goal-subject">Subject</Label>
                     <Input id="goal-subject" className="mt-1.5" placeholder="e.g. Mathematics" value={form.subject} onChange={(e) => setForm(f => ({ ...f, subject: e.target.value }))} />
+                    {formErrors.subject && <p className="text-xs text-red-500 mt-1">{formErrors.subject}</p>}
                   </div>
                   <div>
                     <Label htmlFor="goal-due">Due Date <span className="text-red-500">*</span></Label>
-                    <Input id="goal-due" type="date" className="mt-1.5" value={form.dueDate} onChange={(e) => setForm(f => ({ ...f, dueDate: e.target.value }))} />
-                    {!form.dueDate && <p className="text-xs text-red-500 mt-1">Due date is required</p>}
+                    <Input id="goal-due" type="date" className="mt-1.5" value={form.dueDate} onChange={(e) => { setForm(f => ({ ...f, dueDate: e.target.value })); if (formErrors.dueDate) setFormErrors(prev => { const { dueDate, ...rest } = prev; return rest; }); }} />
+                    {formErrors.dueDate && <p className="text-xs text-red-500 mt-1">{formErrors.dueDate}</p>}
                   </div>
                 </div>
                 <div>
                   <Label htmlFor="goal-desc">Description</Label>
                   <Textarea id="goal-desc" className="mt-1.5" rows={3} placeholder="Describe your goal..." value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} />
+                  {formErrors.description && <p className="text-xs text-red-500 mt-1">{formErrors.description}</p>}
                 </div>
               </div>
               <DialogFooter>

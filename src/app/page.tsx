@@ -11,6 +11,7 @@ import ReflectionsPage from '@/components/pages/ReflectionsPage';
 import DocumentsPage from '@/components/pages/DocumentsPage';
 import GoalsPage from '@/components/pages/GoalsPage';
 import CalendarPage from '@/components/pages/CalendarPage';
+import JournalPage from '@/components/pages/JournalPage';
 import ProfilePage from '@/components/pages/ProfilePage';
 import SettingsPage from '@/components/pages/SettingsPage';
 import HelpCenterPage from '@/components/pages/HelpCenterPage';
@@ -27,6 +28,7 @@ const PAGE_COMPONENTS: Record<PageId, React.ComponentType> = {
   documents: DocumentsPage,
   goals: GoalsPage,
   calendar: CalendarPage,
+  journal: JournalPage,
   profile: ProfilePage,
   settings: SettingsPage,
   help: HelpCenterPage,

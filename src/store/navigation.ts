@@ -10,6 +10,7 @@ export type PageId =
   | 'documents'
   | 'goals'
   | 'calendar'
+  | 'journal'
   | 'profile'
   | 'help'
   | 'sign-out'

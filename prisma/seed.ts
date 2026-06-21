@@ -10,6 +10,7 @@ async function seed() {
 
   // Clean existing data
   await db.studyStreak.deleteMany();
+  await db.journalEntry.deleteMany();
   await db.device.deleteMany();
   await db.notification.deleteMany();
   await db.reminder.deleteMany();
@@ -37,7 +38,7 @@ async function seed() {
       memberSince: "May 2024",
       primaryExam: "IBPS PO",
       secondaryExam: "SSC CGL",
-      targetYear: "2025",
+      targetYear: "2026",
       currentStage: "Prelims Preparation",
       language: "English",
       studyTime: "4-6 hours",
@@ -206,10 +207,10 @@ async function seed() {
 
   // ─── Upcoming Exams ────────────────────────────────────
   const upcomingExams = [
-    { id: "up-001", userId: USER_ID, name: "IBPS PO Prelims 2025", org: "IBPS", priority: "High", examDate: new Date("2025-08-18"), daysLeft: 45, admitCard: false, applicationStatus: "completed", hasReflection: false, hasSyllabus: true, reminderSet: true },
-    { id: "up-002", userId: USER_ID, name: "SSC CGL Tier 1 2025", org: "SSC", priority: "High", examDate: new Date("2025-09-15"), daysLeft: 73, admitCard: false, applicationStatus: "in_progress", hasReflection: false, hasSyllabus: true, reminderSet: true },
-    { id: "up-003", userId: USER_ID, name: "RBI Grade B Phase 1", org: "RBI", priority: "Medium", examDate: new Date("2025-10-20"), daysLeft: 108, admitCard: false, applicationStatus: "not_started", hasReflection: false, hasSyllabus: false, reminderSet: false },
-    { id: "up-004", userId: USER_ID, name: "SBI Clerk Prelims 2025", org: "SBI", priority: "Low", examDate: new Date("2025-11-10"), daysLeft: 129, admitCard: false, applicationStatus: "not_started", hasReflection: false, hasSyllabus: false, reminderSet: false },
+    { id: "up-001", userId: USER_ID, name: "IBPS PO Prelims 2026", org: "IBPS", priority: "High", examDate: new Date("2026-08-18"), daysLeft: 58, admitCard: false, applicationStatus: "completed", hasReflection: false, hasSyllabus: true, reminderSet: true },
+    { id: "up-002", userId: USER_ID, name: "SSC CGL Tier 1 2026", org: "SSC", priority: "High", examDate: new Date("2026-09-15"), daysLeft: 86, admitCard: false, applicationStatus: "in_progress", hasReflection: false, hasSyllabus: true, reminderSet: true },
+    { id: "up-003", userId: USER_ID, name: "RBI Grade B Phase 1", org: "RBI", priority: "Medium", examDate: new Date("2026-10-20"), daysLeft: 121, admitCard: false, applicationStatus: "not_started", hasReflection: false, hasSyllabus: false, reminderSet: false },
+    { id: "up-004", userId: USER_ID, name: "SBI Clerk Prelims 2026", org: "SBI", priority: "Low", examDate: new Date("2026-11-10"), daysLeft: 142, admitCard: false, applicationStatus: "not_started", hasReflection: false, hasSyllabus: false, reminderSet: false },
   ];
 
   for (const ue of upcomingExams) {
@@ -412,7 +413,7 @@ async function seed() {
     { id: "doc-003", userId: USER_ID, name: "IBPS PO Mains Result.pdf", note: "Mains result notification", examName: "IBPS PO Mains 2024", category: "Result", fileSize: 320000, year: "2024" },
     { id: "doc-004", userId: USER_ID, name: "SSC CGL Question Paper.pdf", note: "Tier 1 question paper with answers", examName: "SSC CGL Tier 1 2024", category: "Question Paper", fileSize: 1500000, year: "2024" },
     { id: "doc-005", userId: USER_ID, name: "IBPS Clerk Answer Key.pdf", note: "Official answer key", examName: "IBPS Clerk Prelims 2024", category: "Answer Key", fileSize: 890000, year: "2024" },
-    { id: "doc-006", userId: USER_ID, name: "Banking Syllabus 2025.pdf", note: "Complete banking exam syllabus", examName: "IBPS PO Prelims 2025", category: "Syllabus", fileSize: 450000, year: "2025" },
+    { id: "doc-006", userId: USER_ID, name: "Banking Syllabus 2026.pdf", note: "Complete banking exam syllabus", examName: "IBPS PO Prelims 2026", category: "Syllabus", fileSize: 450000, year: "2026" },
     { id: "doc-007", userId: USER_ID, name: "Quant Notes - DI Sets.pdf", note: "Data interpretation practice notes", examName: "", category: "Notes", fileSize: 670000, year: "2024" },
     { id: "doc-008", userId: USER_ID, name: "GA Current Affairs June.pdf", note: "Monthly current affairs compilation", examName: "", category: "Notes", fileSize: 1200000, year: "2024" },
   ];
@@ -423,19 +424,19 @@ async function seed() {
 
   // ─── Goals — 12 total ──────────────────────────────────
   const goals = [
-    { id: "goal-001", userId: USER_ID, title: "Complete DI Practice Set", priority: "High", linkedExam: "IBPS PO Prelims 2025", subject: "Quantitative Aptitude", dueDate: new Date("2025-07-20"), status: "active", progress: 65, description: "Complete 50 DI sets before IBPS PO Pre" },
-    { id: "goal-002", userId: USER_ID, title: "Daily GA Quiz Streak", priority: "Medium", linkedExam: "SSC CGL Tier 1 2025", subject: "General Awareness", dueDate: new Date("2025-09-10"), status: "active", progress: 40, description: "Maintain daily GA quiz for 30 consecutive days" },
-    { id: "goal-003", userId: USER_ID, title: "Revise Grammar Rules", priority: "High", linkedExam: "IBPS PO Prelims 2025", subject: "English Language", dueDate: new Date("2025-07-25"), status: "active", progress: 80, description: "Complete Wren & Martin revision" },
-    { id: "goal-004", userId: USER_ID, title: "Take 10 Mock Tests", priority: "Medium", linkedExam: "SSC CGL Tier 1 2025", subject: "All Sections", dueDate: new Date("2025-08-30"), status: "active", progress: 30, description: "Complete 10 full-length mock tests for CGL" },
-    { id: "goal-005", userId: USER_ID, title: "Geometry Revision", priority: "Low", linkedExam: "SSC CGL Tier 1 2025", subject: "Quantitative Aptitude", dueDate: new Date("2025-08-15"), status: "active", progress: 20, description: "Complete geometry chapter from R.S. Aggarwal" },
-    { id: "goal-006", userId: USER_ID, title: "Complete Reasoning Puzzles", priority: "High", linkedExam: "IBPS PO Prelims 2025", subject: "Reasoning Ability", dueDate: new Date("2025-07-10"), status: "completed", progress: 100, description: "Complete 100 puzzle sets", completedAt: new Date("2025-07-08") },
-    { id: "goal-007", userId: USER_ID, title: "Vocabulary Builder - 500 Words", priority: "Medium", linkedExam: "SSC CGL Tier 1 2025", subject: "English Language", dueDate: new Date("2025-07-05"), status: "completed", progress: 100, description: "Learn 500 new words", completedAt: new Date("2025-07-04") },
+    { id: "goal-001", userId: USER_ID, title: "Complete DI Practice Set", priority: "High", linkedExam: "IBPS PO Prelims 2026", subject: "Quantitative Aptitude", dueDate: new Date("2026-07-20"), status: "active", progress: 65, description: "Complete 50 DI sets before IBPS PO Pre" },
+    { id: "goal-002", userId: USER_ID, title: "Daily GA Quiz Streak", priority: "Medium", linkedExam: "SSC CGL Tier 1 2026", subject: "General Awareness", dueDate: new Date("2026-09-10"), status: "active", progress: 40, description: "Maintain daily GA quiz for 30 consecutive days" },
+    { id: "goal-003", userId: USER_ID, title: "Revise Grammar Rules", priority: "High", linkedExam: "IBPS PO Prelims 2026", subject: "English Language", dueDate: new Date("2026-07-25"), status: "active", progress: 80, description: "Complete Wren & Martin revision" },
+    { id: "goal-004", userId: USER_ID, title: "Take 10 Mock Tests", priority: "Medium", linkedExam: "SSC CGL Tier 1 2026", subject: "All Sections", dueDate: new Date("2026-08-30"), status: "active", progress: 30, description: "Complete 10 full-length mock tests for CGL" },
+    { id: "goal-005", userId: USER_ID, title: "Geometry Revision", priority: "Low", linkedExam: "SSC CGL Tier 1 2026", subject: "Quantitative Aptitude", dueDate: new Date("2026-08-15"), status: "active", progress: 20, description: "Complete geometry chapter from R.S. Aggarwal" },
+    { id: "goal-006", userId: USER_ID, title: "Complete Reasoning Puzzles", priority: "High", linkedExam: "IBPS PO Prelims 2026", subject: "Reasoning Ability", dueDate: new Date("2026-07-10"), status: "completed", progress: 100, description: "Complete 100 puzzle sets", completedAt: new Date("2026-07-08") },
+    { id: "goal-007", userId: USER_ID, title: "Vocabulary Builder - 500 Words", priority: "Medium", linkedExam: "SSC CGL Tier 1 2026", subject: "English Language", dueDate: new Date("2026-07-05"), status: "completed", progress: 100, description: "Learn 500 new words", completedAt: new Date("2026-07-04") },
     // ── 5 NEW GOALS (goal-008 to goal-012) ──
-    { id: "goal-008", userId: USER_ID, title: "Current Affairs Daily Digest", priority: "High", linkedExam: "IBPS PO Prelims 2025", subject: "General Awareness", dueDate: new Date("2025-08-15"), status: "active", progress: 55, description: "Read and note daily current affairs for 60 days straight before the exam" },
-    { id: "goal-009", userId: USER_ID, title: "Descriptive Writing Practice", priority: "Medium", linkedExam: "IBPS PO Mains 2025", subject: "English Language", dueDate: new Date("2025-09-01"), status: "active", progress: 10, description: "Write 20 essays and 15 letters on banking/financial topics" },
-    { id: "goal-010", userId: USER_ID, title: "Daily Exercise Routine", priority: "Low", linkedExam: "", subject: "Health", dueDate: new Date("2025-12-31"), status: "active", progress: 35, description: "Exercise 30 minutes daily for better focus and exam stamina" },
-    { id: "goal-011", userId: USER_ID, title: "Complete 5000+ Reasoning Questions", priority: "High", linkedExam: "SSC CGL Tier 1 2025", subject: "Reasoning Ability", dueDate: new Date("2025-09-01"), status: "paused", progress: 42, description: "Solve 5000+ reasoning questions across all sub-topics" },
-    { id: "goal-012", userId: USER_ID, title: "Speed Math Mastery", priority: "Medium", linkedExam: "IBPS Clerk Prelims 2025", subject: "Quantitative Aptitude", dueDate: new Date("2025-06-30"), status: "completed", progress: 100, description: "Master Vedic Math and shortcut techniques for faster calculation", completedAt: new Date("2025-06-28") },
+    { id: "goal-008", userId: USER_ID, title: "Current Affairs Daily Digest", priority: "High", linkedExam: "IBPS PO Prelims 2026", subject: "General Awareness", dueDate: new Date("2026-08-15"), status: "active", progress: 55, description: "Read and note daily current affairs for 60 days straight before the exam" },
+    { id: "goal-009", userId: USER_ID, title: "Descriptive Writing Practice", priority: "Medium", linkedExam: "IBPS PO Mains 2026", subject: "English Language", dueDate: new Date("2026-09-01"), status: "active", progress: 10, description: "Write 20 essays and 15 letters on banking/financial topics" },
+    { id: "goal-010", userId: USER_ID, title: "Daily Exercise Routine", priority: "Low", linkedExam: "", subject: "Health", dueDate: new Date("2026-12-31"), status: "active", progress: 35, description: "Exercise 30 minutes daily for better focus and exam stamina" },
+    { id: "goal-011", userId: USER_ID, title: "Complete 5000+ Reasoning Questions", priority: "High", linkedExam: "SSC CGL Tier 1 2026", subject: "Reasoning Ability", dueDate: new Date("2026-09-01"), status: "paused", progress: 42, description: "Solve 5000+ reasoning questions across all sub-topics" },
+    { id: "goal-012", userId: USER_ID, title: "Speed Math Mastery", priority: "Medium", linkedExam: "IBPS Clerk Prelims 2026", subject: "Quantitative Aptitude", dueDate: new Date("2026-06-30"), status: "completed", progress: 100, description: "Master Vedic Math and shortcut techniques for faster calculation", completedAt: new Date("2026-06-28") },
   ];
 
   for (const goal of goals) {
@@ -448,12 +449,12 @@ async function seed() {
   const month = now.getMonth();
 
   const calEvents = [
-    { id: "cal-001", userId: USER_ID, type: "exam", label: "IBPS PO Prelims 2025", date: new Date(year, month, 18), time: "10:00 AM" },
+    { id: "cal-001", userId: USER_ID, type: "exam", label: "IBPS PO Prelims 2026", date: new Date(year, month, 18), time: "10:00 AM" },
     { id: "cal-002", userId: USER_ID, type: "goal", label: "Complete DI Practice Set", date: new Date(year, month, 20), time: "All Day" },
     { id: "cal-003", userId: USER_ID, type: "deadline", label: "SSC CGL Application Last Date", date: new Date(year, month, 25), time: "11:59 PM" },
     { id: "cal-004", userId: USER_ID, type: "reminder", label: "Mock Test - Full Length", date: new Date(year, month, 10), time: "2:00 PM" },
     { id: "cal-005", userId: USER_ID, type: "reflection", label: "Weekly Reflection", date: new Date(year, month, 7), time: "8:00 PM" },
-    { id: "cal-006", userId: USER_ID, type: "exam", label: "SSC CGL Tier 1 2025", date: new Date(year, month + 1, 15), time: "10:00 AM" },
+    { id: "cal-006", userId: USER_ID, type: "exam", label: "SSC CGL Tier 1 2026", date: new Date(year, month + 1, 15), time: "10:00 AM" },
     { id: "cal-007", userId: USER_ID, type: "deadline", label: "RBI Grade B Apply", date: new Date(year, month + 1, 5), time: "11:59 PM" },
     { id: "cal-008", userId: USER_ID, type: "goal", label: "Take Mock Test #5", date: new Date(year, month, 14), time: "2:00 PM" },
     // ── 7 NEW CALENDAR EVENTS (cal-009 to cal-015) ──
@@ -488,7 +489,7 @@ async function seed() {
     { id: "notif-003", userId: USER_ID, title: "Study Streak: 7 Days!", message: "Congratulations! You've maintained a 7-day study streak.", type: "success", isRead: true },
     { id: "notif-004", userId: USER_ID, title: "Exam Result Update", message: "IBPS Clerk Mains 2024 result has been declared.", type: "info", isRead: false },
     // ── 4 NEW NOTIFICATIONS (notif-005 to notif-008) ──
-    { id: "notif-005", userId: USER_ID, title: "SSC CGL Application Reminder", message: "Don't forget to submit your SSC CGL Tier 1 2025 application before the deadline.", type: "reminder", isRead: true },
+    { id: "notif-005", userId: USER_ID, title: "SSC CGL Application Reminder", message: "Don't forget to submit your SSC CGL Tier 1 2026 application before the deadline.", type: "reminder", isRead: true },
     { id: "notif-006", userId: USER_ID, title: "Goal Completed: Speed Math Mastery", message: "You've completed the 'Speed Math Mastery' goal! Great job mastering Vedic Math techniques.", type: "achievement", isRead: true },
     { id: "notif-007", userId: USER_ID, title: "Weekly Performance Insight", message: "Your Quant scores improved by 12% this week. Keep up the DI practice!", type: "insight", isRead: false },
     { id: "notif-008", userId: USER_ID, title: "System Update", message: "New features added: Calendar sync and improved analytics dashboard. Check them out!", type: "system", isRead: true },
@@ -522,6 +523,21 @@ async function seed() {
     },
   });
 
+  // ─── Journal Entries ────────────────────────────────────
+  const journalEntries = [
+    { id: "journal-001", userId: USER_ID, date: new Date("2026-06-15"), mood: "motivated", content: "Completed DI practice sets. Feeling confident about upcoming IBPS PO exam. Need to focus more on reasoning puzzles.", studyHours: 4.5, topics: "DI,Reasoning" },
+    { id: "journal-002", userId: USER_ID, date: new Date("2026-06-16"), mood: "happy", content: "Great day! Scored 78% in mock test. Current affairs revision going well. GA quiz streak at 12 days.", studyHours: 6, topics: "Mock Test,GA,Current Affairs" },
+    { id: "journal-003", userId: USER_ID, date: new Date("2026-06-17"), mood: "tired", content: "Long study session but felt drained towards the end. Need to take proper breaks. Maybe try Pomodoro technique.", studyHours: 7, topics: "Quantitative,English" },
+    { id: "journal-004", userId: USER_ID, date: new Date("2026-06-18"), mood: "neutral", content: "Average day. Covered grammar rules and vocabulary. Error spotting needs more practice.", studyHours: 3.5, topics: "English,Grammar,Vocabulary" },
+    { id: "journal-005", userId: USER_ID, date: new Date("2026-06-19"), mood: "frustrated", content: "Struggled with reasoning puzzles today. Time management in sectional tests is still an issue. Will focus on speed drills tomorrow.", studyHours: 5, topics: "Reasoning,Puzzles,Speed" },
+    { id: "journal-006", userId: USER_ID, date: new Date("2026-06-20"), mood: "motivated", content: "Better day! Improved puzzle solving speed. Completed 3 full sectional tests. Feeling prepared for the upcoming exam.", studyHours: 5.5, topics: "Reasoning,Mock Test,Sectional" },
+    { id: "journal-007", userId: USER_ID, date: new Date("2026-06-21"), mood: "happy", content: "Review day. Went through all weak areas identified this week. Made a study plan for next 2 weeks. Feeling organized and ready!", studyHours: 3, topics: "Review,Planning,Revision" },
+  ];
+
+  for (const entry of journalEntries) {
+    await db.journalEntry.create({ data: entry });
+  }
+
   console.log("Seed completed successfully!");
   console.log(`  - User: ${user.name}`);
   console.log(`  - Exams: ${exams.length}`);
@@ -533,6 +549,7 @@ async function seed() {
   console.log(`  - Reminders: ${reminders.length}`);
   console.log(`  - Notifications: ${notifications.length}`);
   console.log(`  - Devices: ${devices.length}`);
+  console.log(`  - Journal Entries: ${journalEntries.length}`);
 }
 
 seed()

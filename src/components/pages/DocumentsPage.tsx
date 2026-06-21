@@ -52,6 +52,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { documentFormSchema } from '@/lib/validations';
 import {
   Select,
   SelectContent,
@@ -171,6 +172,7 @@ function CreateDocumentDialog({
   const [examName, setExamName] = useState('');
   const [year, setYear] = useState('');
   const [note, setNote] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const { data: examOptions } = useQuery({
     queryKey: ['exam-options-docs'],
@@ -198,11 +200,23 @@ function CreateDocumentDialog({
     setExamName('');
     setYear('');
     setNote('');
+    setFormErrors({});
   };
 
   const handleSubmit = () => {
-    if (!name.trim()) { toast.error('Document name is required'); return; }
-    if (!category) { toast.error('Please select a category'); return; }
+    const result = documentFormSchema.safeParse({ name: name.trim(), category, type: category, description: note || undefined, linkedExam: examName || undefined });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      const fieldErrors = result.error.flatten().fieldErrors;
+      for (const [key, messages] of Object.entries(fieldErrors)) {
+        if (messages && messages.length > 0) {
+          errors[key] = messages[0];
+        }
+      }
+      setFormErrors(errors);
+      return;
+    }
+    setFormErrors({});
     createMutation.mutate({
       name: name.trim(),
       category,
@@ -231,8 +245,9 @@ function CreateDocumentDialog({
             <Input
               placeholder="e.g. IBPS PO 2024 Scorecard"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => { setName(e.target.value); if (formErrors.name) setFormErrors(prev => { const { name, ...rest } = prev; return rest; }); }}
             />
+            {formErrors.name && <p className="text-xs text-red-500 mt-1">{formErrors.name}</p>}
           </div>
 
           {/* Category & Year */}
@@ -241,7 +256,7 @@ function CreateDocumentDialog({
               <Label className="text-sm font-medium">
                 Category <span className="text-red-500">*</span>
               </Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category} onValueChange={(v) => { setCategory(v); if (formErrors.category) setFormErrors(prev => { const { category, ...rest } = prev; return rest; }); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select..." />
                 </SelectTrigger>
@@ -259,6 +274,7 @@ function CreateDocumentDialog({
                   })}
                 </SelectContent>
               </Select>
+              {formErrors.category && <p className="text-xs text-red-500 mt-1">{formErrors.category}</p>}
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-medium">Year</Label>

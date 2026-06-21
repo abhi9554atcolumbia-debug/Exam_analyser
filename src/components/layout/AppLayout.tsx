@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Sidebar, MobileSidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { CommandSearch } from '@/components/CommandSearch';
+import { PomodoroTimer } from '@/components/PomodoroTimer';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNavigationStore } from '@/store/navigation';
 import { useUserStore } from '@/store/user-store';
@@ -99,6 +100,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
       {/* Global Command Search Dialog */}
       <CommandSearch />
+
+      {/* Pomodoro Timer Widget */}
+      <PomodoroTimer />
     </div>
   );
 }

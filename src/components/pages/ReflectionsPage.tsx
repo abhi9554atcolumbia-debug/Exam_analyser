@@ -43,6 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { reflectionFormSchema } from '@/lib/validations';
 import {
   Select,
   SelectContent,
@@ -345,6 +346,7 @@ function CreateReflectionDialog({
   const [biggestLesson, setBiggestLesson] = useState('');
   const [actionPlan, setActionPlan] = useState('');
   const [targetScore, setTargetScore] = useState('');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const { data: examOptions, isLoading: loadingOptions } = useQuery({
     queryKey: ['reflection-exam-options'],
@@ -383,13 +385,33 @@ function CreateReflectionDialog({
     setBiggestLesson('');
     setActionPlan('');
     setTargetScore('');
+    setFormErrors({});
   };
 
   const handleSubmit = () => {
-    if (!examId) {
-      toast.error('Please select an exam');
+    const result = reflectionFormSchema.safeParse({
+      examId,
+      difficulty: difficulty || undefined,
+      confidence,
+      emotionalState: emotionalState || undefined,
+      whatWentWell: whatWentWell || '',
+      whatWentWrong: whatWentWrong || '',
+      biggestLesson: biggestLesson || '',
+      actionPlan: actionPlan || undefined,
+      targetScore: targetScore ? Number(targetScore) : undefined,
+    });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      const fieldErrors = result.error.flatten().fieldErrors;
+      for (const [key, messages] of Object.entries(fieldErrors)) {
+        if (messages && messages.length > 0) {
+          errors[key] = messages[0];
+        }
+      }
+      setFormErrors(errors);
       return;
     }
+    setFormErrors({});
     createMutation.mutate({
       examId,
       examName: selectedExam?.name ?? '',
@@ -455,7 +477,7 @@ function CreateReflectionDialog({
             <Label className="text-sm font-medium">
               Select Exam <span className="text-red-500">*</span>
             </Label>
-            <Select value={examId} onValueChange={setExamId}>
+            <Select value={examId} onValueChange={(v) => { setExamId(v); if (formErrors.examId) setFormErrors(prev => { const { examId, ...rest } = prev; return rest; }); }}>
               <SelectTrigger>
                 <SelectValue placeholder="Choose an exam..." />
               </SelectTrigger>
@@ -472,9 +494,8 @@ function CreateReflectionDialog({
                 )}
               </SelectContent>
             </Select>
+            {formErrors.examId && <p className="text-xs text-red-500 mt-1">{formErrors.examId}</p>}
           </div>
-
-          {/* Exam Summary */}
           {loadingExam && examId && (
             <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
               <Skeleton className="h-4 w-40" />
@@ -511,7 +532,7 @@ function CreateReflectionDialog({
                   key={d}
                   label={d}
                   active={difficulty === d}
-                  onClick={() => setDifficulty(difficulty === d ? '' : d)}
+                  onClick={() => { setDifficulty(difficulty === d ? '' : d); if (formErrors.difficulty) setFormErrors(prev => { const { difficulty, ...rest } = prev; return rest; }); }}
                   activeColor={
                     d === 'Easy' ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
                     : d === 'Moderate' ? 'border-amber-500 bg-amber-500/15 text-amber-700 dark:text-amber-400'
@@ -521,6 +542,7 @@ function CreateReflectionDialog({
                 />
               ))}
             </div>
+            {formErrors.difficulty && <p className="text-xs text-red-500 mt-1">{formErrors.difficulty}</p>}
           </div>
 
           {/* Confidence Slider */}
@@ -554,12 +576,13 @@ function CreateReflectionDialog({
                     key={e}
                     label={e}
                     active={emotionalState === e}
-                    onClick={() => setEmotionalState(emotionalState === e ? '' : e)}
+                    onClick={() => { setEmotionalState(emotionalState === e ? '' : e); if (formErrors.emotionalState) setFormErrors(prev => { const { emotionalState, ...rest } = prev; return rest; }); }}
                     activeColor={cn('border', cfg.cls, cfg.bg.replace('dark:', 'dark:').replace('100', '500/15').replace('50', '500/15'))}
                   />
                 );
               })}
             </div>
+            {formErrors.emotionalState && <p className="text-xs text-red-500 mt-1">{formErrors.emotionalState}</p>}
           </div>
 
           <Separator />
@@ -572,10 +595,11 @@ function CreateReflectionDialog({
             <Textarea
               placeholder="Describe what went well in the exam..."
               value={whatWentWell}
-              onChange={(e) => setWhatWentWell(e.target.value)}
+              onChange={(e) => { setWhatWentWell(e.target.value); if (formErrors.whatWentWell) setFormErrors(prev => { const { whatWentWell, ...rest } = prev; return rest; }); }}
               rows={3}
               className="resize-none"
             />
+            {formErrors.whatWentWell && <p className="text-xs text-red-500 mt-1">{formErrors.whatWentWell}</p>}
           </div>
 
           {/* What Went Wrong */}
@@ -586,10 +610,11 @@ function CreateReflectionDialog({
             <Textarea
               placeholder="Describe what didn't go as planned..."
               value={whatWentWrong}
-              onChange={(e) => setWhatWentWrong(e.target.value)}
+              onChange={(e) => { setWhatWentWrong(e.target.value); if (formErrors.whatWentWrong) setFormErrors(prev => { const { whatWentWrong, ...rest } = prev; return rest; }); }}
               rows={3}
               className="resize-none"
             />
+            {formErrors.whatWentWrong && <p className="text-xs text-red-500 mt-1">{formErrors.whatWentWrong}</p>}
           </div>
 
           {/* Biggest Lesson */}
@@ -600,10 +625,11 @@ function CreateReflectionDialog({
             <Textarea
               placeholder="What's the most important thing you learned?"
               value={biggestLesson}
-              onChange={(e) => setBiggestLesson(e.target.value)}
+              onChange={(e) => { setBiggestLesson(e.target.value); if (formErrors.biggestLesson) setFormErrors(prev => { const { biggestLesson, ...rest } = prev; return rest; }); }}
               rows={2}
               className="resize-none"
             />
+            {formErrors.biggestLesson && <p className="text-xs text-red-500 mt-1">{formErrors.biggestLesson}</p>}
           </div>
 
           {/* Action Plan */}
@@ -627,9 +653,10 @@ function CreateReflectionDialog({
               type="number"
               placeholder="e.g. 85"
               value={targetScore}
-              onChange={(e) => setTargetScore(e.target.value)}
+              onChange={(e) => { setTargetScore(e.target.value); if (formErrors.targetScore) setFormErrors(prev => { const { targetScore, ...rest } = prev; return rest; }); }}
               className="max-w-[200px]"
             />
+            {formErrors.targetScore && <p className="text-xs text-red-500 mt-1">{formErrors.targetScore}</p>}
           </div>
         </div>
 

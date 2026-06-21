@@ -755,6 +755,20 @@ export default function DashboardPage() {
               <p className="mt-0.5 text-[11px] text-muted-foreground">Analyze your performance</p>
             </div>
           </Button>
+          <Button
+            variant="outline"
+            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+            onClick={() => navigate('journal')}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-teal-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-emerald-950/0 dark:to-teal-950/0" />
+            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm shadow-emerald-500/20">
+              <BookOpen className="size-5 text-white" />
+            </div>
+            <div className="relative text-center">
+              <span className="text-sm font-semibold text-foreground">Write Journal</span>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Log today&apos;s study</p>
+            </div>
+          </Button>
         </div>
       </div>
 

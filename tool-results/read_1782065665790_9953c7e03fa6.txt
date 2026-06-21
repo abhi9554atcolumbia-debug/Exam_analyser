@@ -1,0 +1,1208 @@
+     1→'use client';
+     2→
+     3→import { useState, useMemo, useEffect } from 'react';
+     4→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+     5→import { toast } from 'sonner';
+     6→import {
+     7→  GraduationCap,
+     8→  Trophy,
+     9→  BarChart3,
+    10→  Target,
+    11→  Plus,
+    12→  CalendarPlus,
+    13→  Upload,
+    14→  BookOpen,
+    15→  TrendingUp,
+    16→  Clock,
+    17→  AlertTriangle,
+    18→  CheckCircle2,
+    19→  XCircle,
+    20→  Lightbulb,
+    21→  ArrowRight,
+    22→  Sparkles,
+    23→  Sun,
+    24→  Moon,
+    25→  CloudSun,
+    26→  Flame,
+    27→  Zap,
+    28→  Activity,
+    29→  FileText,
+    30→  Timer,
+    31→} from 'lucide-react';
+    32→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    33→import { Button } from '@/components/ui/button';
+    34→import { Badge } from '@/components/ui/badge';
+    35→import { Input } from '@/components/ui/input';
+    36→import { Label } from '@/components/ui/label';
+    37→import { Skeleton } from '@/components/ui/skeleton';
+    38→import {
+    39→  Dialog,
+    40→  DialogContent,
+    41→  DialogHeader,
+    42→  DialogTitle,
+    43→  DialogTrigger,
+    44→  DialogFooter,
+    45→  DialogClose,
+    46→} from '@/components/ui/dialog';
+    47→import {
+    48→  Select,
+    49→  SelectContent,
+    50→  SelectItem,
+    51→  SelectTrigger,
+    52→  SelectValue,
+    53→} from '@/components/ui/select';
+    54→import {
+    55→  Table,
+    56→  TableBody,
+    57→  TableCell,
+    58→  TableHead,
+    59→  TableHeader,
+    60→  TableRow,
+    61→} from '@/components/ui/table';
+    62→import { StatCard } from '@/components/ui/StatCard';
+    63→import { ProgressBar } from '@/components/ui/ProgressBar';
+    64→import { TrendLineChart } from '@/components/charts/TrendLineChart';
+    65→import {
+    66→  getDashboard,
+    67→  createExam,
+    68→  type DashboardData,
+    69→  type Exam,
+    70→} from '@/lib/api';
+    71→import { useNavigationStore } from '@/store/navigation';
+    72→import { cn } from '@/lib/utils';
+    73→
+    74→// ─── Helpers ───────────────────────────────────────────────
+    75→function getGreeting(): { text: string; icon: typeof Sun } {
+    76→  const h = new Date().getHours();
+    77→  if (h < 12) return { text: 'Good morning', icon: Sun };
+    78→  if (h < 17) return { text: 'Good afternoon', icon: CloudSun };
+    79→  return { text: 'Good evening', icon: Moon };
+    80→}
+    81→
+    82→function formatDate(dateStr: string): string {
+    83→  const d = new Date(dateStr);
+    84→  return d.toLocaleDateString('en-IN', {
+    85→    day: 'numeric',
+    86→    month: 'short',
+    87→    year: 'numeric',
+    88→  });
+    89→}
+    90→
+    91→function formatCountdown(days: number | null): string {
+    92→  if (days === null || days === undefined) return '—';
+    93→  if (days === 0) return 'Today!';
+    94→  if (days === 1) return 'Tomorrow';
+    95→  return `${days} days left`;
+    96→}
+    97→
+    98→function getMotivationalQuote(): string {
+    99→  const quotes = [
+   100→    '"The secret of getting ahead is getting started." — Mark Twain',
+   101→    '"Success is the sum of small efforts, repeated day in and day out." — Robert Collier',
+   102→    '"It always seems impossible until it\'s done." — Nelson Mandela',
+   103→    '"Don\'t watch the clock; do what it does. Keep going." — Sam Levenson',
+   104→    '"Hard work beats talent when talent doesn\'t work hard." — Tim Notke',
+   105→    '"The only way to do great work is to love what you do." — Steve Jobs',
+   106→    '"Believe you can and you\'re halfway there." — Theodore Roosevelt',
+   107→  ];
+   108→  const dayOfYear = Math.floor(
+   109→    (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
+   110→      86400000,
+   111→  );
+   112→  return quotes[dayOfYear % quotes.length];
+   113→}
+   114→
+   115→function getWeekStreakDots(): boolean[] {
+   116→  // Simulated 7-day streak: last 7 days (today = last)
+   117→  const today = new Date();
+   118→  const dots: boolean[] = [];
+   119→  for (let i = 6; i >= 0; i--) {
+   120→    const d = new Date(today);
+   121→    d.setDate(d.getDate() - i);
+   122→    // Pseudo-random based on day — always mark today and 4 others as active
+   123→    const dayHash = (d.getDate() * 7 + d.getMonth() * 31) % 10;
+   124→    dots.push(i === 0 || dayHash < 5);
+   125→  }
+   126→  return dots;
+   127→}
+   128→
+   129→function getDayLabel(index: number): string {
+   130→  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+   131→  const today = new Date().getDay();
+   132→  return days[(today - 6 + index + 7) % 7];
+   133→}
+   134→
+   135→const categoryColors: Record<string, string> = {
+   136→  Banking: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800',
+   137→  SSC: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+   138→  Railway: 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300 border-sky-200 dark:border-sky-800',
+   139→  Insurance: 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300 border-purple-200 dark:border-purple-800',
+   140→  Other: 'bg-gray-100 text-gray-700 dark:bg-gray-900/50 dark:text-gray-300 border-gray-200 dark:border-gray-800',
+   141→};
+   142→
+   143→function getSeverityColor(avgScore: number): string {
+   144→  if (avgScore >= 60) return 'bg-emerald-500';
+   145→  if (avgScore >= 40) return 'bg-amber-500';
+   146→  return 'bg-red-500';
+   147→}
+   148→
+   149→function getSeverityLabel(avgScore: number): string {
+   150→  if (avgScore >= 60) return 'Good';
+   151→  if (avgScore >= 40) return 'Needs Work';
+   152→  return 'Critical';
+   153→}
+   154→
+   155→function getCountdown(examDate: string): { days: number; hours: number; isPast: boolean } {
+   156→  const target = new Date(examDate);
+   157→  const now = new Date();
+   158→  const diff = target.getTime() - now.getTime();
+   159→  if (diff <= 0) return { days: 0, hours: 0, isPast: true };
+   160→  return {
+   161→    days: Math.floor(diff / 86400000),
+   162→    hours: Math.floor((diff % 86400000) / 3600000),
+   163→    isPast: false,
+   164→  };
+   165→}
+   166→
+   167→// ─── Add Exam Dialog ────────────────────────────────────────
+   168→function AddExamDialog({
+   169→  open,
+   170→  onOpenChange,
+   171→}: {
+   172→  open: boolean;
+   173→  onOpenChange: (open: boolean) => void;
+   174→}) {
+   175→  const queryClient = useQueryClient();
+   176→
+   177→  const [form, setForm] = useState({
+   178→    name: '',
+   179→    org: '',
+   180→    category: 'Banking',
+   181→    stage: 'Prelims',
+   182→    examDate: '',
+   183→    score: '',
+   184→    maxScore: '100',
+   185→    cutoff: '',
+   186→    result: 'Not Qualified',
+   187→    sections: [] as { section: string; score: string; max: string }[],
+   188→  });
+   189→
+   190→  const mutation = useMutation({
+   191→    mutationFn: () =>
+   192→      createExam({
+   193→        name: form.name,
+   194→        org: form.org || undefined,
+   195→        category: form.category,
+   196→        stage: form.stage,
+   197→        examDate: form.examDate,
+   198→        score: Number(form.score),
+   199→        maxScore: Number(form.maxScore),
+   200→        cutoff: Number(form.cutoff),
+   201→        result: form.result,
+   202→        sectionalScores: form.sections
+   203→          .filter((s) => s.section)
+   204→          .map((s) => ({
+   205→            section: s.section,
+   206→            score: Number(s.score),
+   207→            max: Number(s.max),
+   208→          })),
+   209→      }),
+   210→    onSuccess: () => {
+   211→      toast.success('Exam added successfully!');
+   212→      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+   213→      onOpenChange(false);
+   214→      setForm({
+   215→        name: '',
+   216→        org: '',
+   217→        category: 'Banking',
+   218→        stage: 'Prelims',
+   219→        examDate: '',
+   220→        score: '',
+   221→        maxScore: '100',
+   222→        cutoff: '',
+   223→        result: 'Not Qualified',
+   224→        sections: [],
+   225→      });
+   226→    },
+   227→    onError: () => {
+   228→      toast.error('Failed to add exam. Please try again.');
+   229→    },
+   230→  });
+   231→
+   232→  const addSection = () => {
+   233→    setForm((f) => [
+   234→      ...f.sections,
+   235→      { section: '', score: '', max: '' },
+   236→    ]);
+   237→  };
+   238→
+   239→  const removeSection = (idx: number) => {
+   240→    setForm((f) => f.sections.filter((_, i) => i !== idx));
+   241→  };
+   242→
+   243→  const updateSection = (
+   244→    idx: number,
+   245→    field: 'section' | 'score' | 'max',
+   246→    value: string,
+   247→  ) => {
+   248→    setForm((f) =>
+   249→      f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+   250→    );
+   251→  };
+   252→
+   253→  return (
+   254→    <Dialog open={open} onOpenChange={onOpenChange}>
+   255→      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+   256→        <DialogHeader>
+   257→          <DialogTitle>Add Exam Result</DialogTitle>
+   258→        </DialogHeader>
+   259→
+   260→        <div className="grid gap-4 py-2">
+   261→          <div className="grid gap-2">
+   262→            <Label htmlFor="exam-name">Exam Name</Label>
+   263→            <Input
+   264→              id="exam-name"
+   265→              placeholder="e.g. SBI PO 2025"
+   266→              value={form.name}
+   267→              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+   268→            />
+   269→          </div>
+   270→
+   271→          <div className="grid grid-cols-2 gap-4">
+   272→            <div className="grid gap-2">
+   273→              <Label htmlFor="exam-org">Organization</Label>
+   274→              <Input
+   275→                id="exam-org"
+   276→                placeholder="e.g. SBI"
+   277→                value={form.org}
+   278→                onChange={(e) => setForm((f) => ({ ...f, org: e.target.value }))}
+   279→              />
+   280→            </div>
+   281→            <div className="grid gap-2">
+   282→              <Label>Category</Label>
+   283→              <Select
+   284→                value={form.category}
+   285→                onValueChange={(v) => setForm((f) => ({ ...f, category: v }))}
+   286→              >
+   287→                <SelectTrigger>
+   288→                  <SelectValue />
+   289→                </SelectTrigger>
+   290→                <SelectContent>
+   291→                  <SelectItem value="Banking">Banking</SelectItem>
+   292→                  <SelectItem value="SSC">SSC</SelectItem>
+   293→                  <SelectItem value="Railway">Railway</SelectItem>
+   294→                  <SelectItem value="Insurance">Insurance</SelectItem>
+   295→                  <SelectItem value="Other">Other</SelectItem>
+   296→                </SelectContent>
+   297→              </Select>
+   298→            </div>
+   299→          </div>
+   300→
+   301→          <div className="grid grid-cols-2 gap-4">
+   302→            <div className="grid gap-2">
+   303→              <Label>Stage</Label>
+   304→              <Select
+   305→                value={form.stage}
+   306→                onValueChange={(v) => setForm((f) => ({ ...f, stage: v }))}
+   307→              >
+   308→                <SelectTrigger>
+   309→                  <SelectValue />
+   310→                </SelectTrigger>
+   311→                <SelectContent>
+   312→                  <SelectItem value="Prelims">Prelims</SelectItem>
+   313→                  <SelectItem value="Mains">Mains</SelectItem>
+   314→                  <SelectItem value="Interview">Interview</SelectItem>
+   315→                  <SelectItem value="Final">Final</SelectItem>
+   316→                </SelectContent>
+   317→              </Select>
+   318→            </div>
+   319→            <div className="grid gap-2">
+   320→              <Label htmlFor="exam-date">Exam Date</Label>
+   321→              <Input
+   322→                id="exam-date"
+   323→                type="date"
+   324→                value={form.examDate}
+   325→                onChange={(e) =>
+   326→                  setForm((f) => ({ ...f, examDate: e.target.value }))
+   327→                }
+   328→              />
+   329→            </div>
+   330→          </div>
+   331→
+   332→          <div className="grid grid-cols-3 gap-4">
+   333→            <div className="grid gap-2">
+   334→              <Label htmlFor="score">Score</Label>
+   335→              <Input
+   336→                id="score"
+   337→                type="number"
+   338→                placeholder="0"
+   339→                value={form.score}
+   340→                onChange={(e) => setForm((f) => ({ ...f, score: e.target.value }))}
+   341→              />
+   342→            </div>
+   343→            <div className="grid gap-2">
+   344→              <Label htmlFor="max-score">Max Score</Label>
+   345→              <Input
+   346→                id="max-score"
+   347→                type="number"
+   348→                placeholder="100"
+   349→                value={form.maxScore}
+   350→                onChange={(e) =>
+   351→                  setForm((f) => ({ ...f, maxScore: e.target.value }))
+   352→                }
+   353→              />
+   354→            </div>
+   355→            <div className="grid gap-2">
+   356→              <Label htmlFor="cutoff">Cutoff</Label>
+   357→              <Input
+   358→                id="cutoff"
+   359→                type="number"
+   360→                placeholder="0"
+   361→                value={form.cutoff}
+   362→                onChange={(e) =>
+   363→                  setForm((f) => ({ ...f, cutoff: e.target.value }))
+   364→                }
+   365→              />
+   366→            </div>
+   367→          </div>
+   368→
+   369→          <div className="grid gap-2">
+   370→            <Label>Result</Label>
+   371→            <Select
+   372→              value={form.result}
+   373→              onValueChange={(v) => setForm((f) => ({ ...f, result: v }))}
+   374→            >
+   375→              <SelectTrigger>
+   376→                <SelectValue />
+   377→              </SelectTrigger>
+   378→              <SelectContent>
+   379→                <SelectItem value="Qualified">Qualified</SelectItem>
+   380→                <SelectItem value="Not Qualified">Not Qualified</SelectItem>
+   381→                <SelectItem value="Awaited">Result Awaited</SelectItem>
+   382→              </SelectContent>
+   383→            </Select>
+   384→          </div>
+   385→
+   386→          {/* Sectional Scores */}
+   387→          <div className="grid gap-3">
+   388→            <div className="flex items-center justify-between">
+   389→              <Label>Sectional Scores (optional)</Label>
+   390→              <Button
+   391→                variant="outline"
+   392→                size="sm"
+   393→                type="button"
+   394→                onClick={addSection}
+   395→              >
+   396→                <Plus className="mr-1 size-3.5" />
+   397→                Add Section
+   398→              </Button>
+   399→            </div>
+   400→            {form.sections.map((sec, idx) => (
+   401→              <div key={idx} className="grid grid-cols-[1fr_80px_80px_auto] gap-2">
+   402→                <Input
+   403→                  placeholder="Section name"
+   404→                  value={sec.section}
+   405→                  onChange={(e) =>
+   406→                    updateSection(idx, 'section', e.target.value)
+   407→                  }
+   408→                />
+   409→                <Input
+   410→                  type="number"
+   411→                  placeholder="Score"
+   412→                  value={sec.score}
+   413→                  onChange={(e) =>
+   414→                    updateSection(idx, 'score', e.target.value)
+   415→                  }
+   416→                />
+   417→                <Input
+   418→                  type="number"
+   419→                  placeholder="Max"
+   420→                  value={sec.max}
+   421→                  onChange={(e) =>
+   422→                    updateSection(idx, 'max', e.target.value)
+   423→                  }
+   424→                />
+   425→                <Button
+   426→                  variant="ghost"
+   427→                  size="icon"
+   428→                  onClick={() => removeSection(idx)}
+   429→                >
+   430→                  <XCircle className="size-4 text-muted-foreground" />
+   431→                </Button>
+   432→              </div>
+   433→            ))}
+   434→          </div>
+   435→        </div>
+   436→
+   437→        <DialogFooter>
+   438→          <DialogClose asChild>
+   439→            <Button variant="outline">Cancel</Button>
+   440→          </DialogClose>
+   441→          <Button
+   442→            onClick={() => mutation.mutate()}
+   443→            disabled={mutation.isPending || !form.name || !form.examDate || !form.score}
+   444→          >
+   445→            {mutation.isPending ? 'Saving...' : 'Add Exam'}
+   446→          </Button>
+   447→        </DialogFooter>
+   448→      </DialogContent>
+   449→    </Dialog>
+   450→  );
+   451→}
+   452→
+   453→// ─── Dashboard Page ─────────────────────────────────────────
+   454→export default function DashboardPage() {
+   455→  const navigate = useNavigationStore((s) => s.navigate);
+   456→  const [addExamOpen, setAddExamOpen] = useState(false);
+   457→  const [currentTime, setCurrentTime] = useState(new Date());
+   458→
+   459→  useEffect(() => {
+   460→    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+   461→    return () => clearInterval(timer);
+   462→  }, []);
+   463→
+   464→  const { data, isLoading } = useQuery<DashboardData>({
+   465→    queryKey: ['dashboard'],
+   466→    queryFn: getDashboard,
+   467→  });
+   468→
+   469→  const qualificationRate = useMemo(() => {
+   470→    if (!data) return 0;
+   471→    return data.stats.totalExams > 0
+   472→      ? Math.round(
+   473→          (data.stats.qualified / data.stats.totalExams) * 100,
+   474→        )
+   475→      : 0;
+   476→  }, [data]);
+   477→
+   478→  const greeting = getGreeting();
+   479→  const GreetingIcon = greeting.icon;
+   480→  const weekDots = useMemo(() => getWeekStreakDots(), []);
+   481→  const nextExamCountdown = useMemo(() => {
+   482→    if (!data?.nextExam?.examDate) return null;
+   483→    return getCountdown(data.nextExam.examDate);
+   484→  }, [data]);
+   485→
+   486→  // Build recent activity from recent exams
+   487→  const recentActivity = useMemo(() => {
+   488→    if (!data?.recentExams?.length) return [];
+   489→    return data.recentExams.slice(0, 4).map((exam) => ({
+   490→      id: exam.id,
+   491→      type: exam.result === 'Qualified' ? 'success' : exam.result === 'Awaited' ? 'pending' : 'info',
+   492→      title: exam.name,
+   493→      description: `Scored ${exam.score}% — ${exam.result}`,
+   494→      time: formatDate(exam.date),
+   495→      icon: exam.result === 'Qualified' ? CheckCircle2 : exam.result === 'Awaited' ? Clock : FileText,
+   496→    }));
+   497→  }, [data]);
+   498→
+   499→  return (
+   500→    <div className="relative space-y-6 pb-20 md:pb-6">
+   501→      {/* ─── Greeting Section ───────────────────────────────── */}
+   502→      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-emerald-50 via-white to-teal-50/50 px-5 py-5 shadow-sm sm:px-6 sm:py-6 dark:from-emerald-950/30 dark:via-card dark:to-teal-950/10">
+   503→        {/* Decorative gradient circles */}
+   504→        <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-gradient-to-br from-emerald-200/30 to-teal-200/20 blur-2xl dark:from-emerald-700/10 dark:to-teal-700/10" />
+   505→        <div className="pointer-events-none absolute -bottom-6 -left-6 size-24 rounded-full bg-gradient-to-tr from-teal-200/20 to-emerald-200/10 blur-xl dark:from-teal-700/10 dark:to-emerald-700/5" />
+   506→
+   507→        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   508→          <div className="flex items-start gap-4">
+   509→            <div className="mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-md shadow-emerald-500/20">
+   510→              <GreetingIcon className="size-6 text-white" />
+   511→            </div>
+   512→            <div>
+   513→              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+   514→                {greeting.text}, Aman 👋
+   515→              </h1>
+   516→              <p className="mt-1 text-sm text-muted-foreground">
+   517→                Welcome back! You&apos;ve tracked{' '}
+   518→                <span className="font-semibold text-foreground">
+   519→                  {data?.stats.totalExams ?? 0} exam{((data?.stats.totalExams ?? 0) !== 1) ? 's' : ''}
+   520→                </span>{' '}
+   521→                so far. Keep pushing forward!
+   522→              </p>
+   523→            </div>
+   524→          </div>
+   525→          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+   526→            <Clock className="size-3.5" />
+   527→            <span>
+   528→              {currentTime.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
+   529→            </span>
+   530→          </div>
+   531→        </div>
+   532→      </div>
+   533→
+   534→      {/* ─── Motivational Quote ─────────────────────────────── */}
+   535→      <div className="flex items-start gap-3 rounded-xl border border-border/50 bg-gradient-to-r from-teal-50/60 to-transparent px-4 py-3 dark:from-teal-950/15 dark:to-transparent">
+   536→        <Lightbulb className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
+   537→        <p className="text-sm italic leading-relaxed text-muted-foreground">
+   538→          {getMotivationalQuote()}
+   539→        </p>
+   540→      </div>
+   541→
+   542→      {/* ─── Stat Cards ─────────────────────────────────────── */}
+   543→      {isLoading ? (
+   544→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   545→          {Array.from({ length: 4 }).map((_, i) => (
+   546→            <Skeleton key={i} className="h-[130px] rounded-2xl" />
+   547→          ))}
+   548→        </div>
+   549→      ) : (
+   550→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   551→          <StatCard
+   552→            icon={GraduationCap}
+   553→            label="Total Exams"
+   554→            value={data?.stats.totalExams ?? 0}
+   555→            change="+2 this month"
+   556→            trend="up"
+   557→            color="emerald"
+   558→            pattern
+   559→          />
+   560→          <StatCard
+   561→            icon={Trophy}
+   562→            label="Qualified"
+   563→            value={`${qualificationRate}%`}
+   564→            change={`${data?.stats.qualified ?? 0} exams`}
+   565→            trend={qualificationRate >= 50 ? 'up' : 'down'}
+   566→            color="teal"
+   567→            pattern
+   568→          />
+   569→          <StatCard
+   570→            icon={BarChart3}
+   571→            label="Average Score"
+   572→            value={`${data?.stats.avgScore ?? 0}%`}
+   573→            change="+3.2% from last"
+   574→            trend="up"
+   575→            color="amber"
+   576→            pattern
+   577→          />
+   578→          <StatCard
+   579→            icon={Target}
+   580→            label="Avg Cutoff Gap"
+   581→            value={data?.stats.avgCutoffGap ?? 0}
+   582→            change={data && data.stats.avgCutoffGap > 0 ? 'Above cutoff' : 'Below cutoff'}
+   583→            trend={data && data.stats.avgCutoffGap <= 0 ? 'up' : 'down'}
+   584→            color={data && data.stats.avgCutoffGap > 0 ? 'red' : 'emerald'}
+   585→            pattern
+   586→          />
+   587→        </div>
+   588→      )}
+   589→
+   590→      {/* ─── Section Divider ────────────────────────────────── */}
+   591→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+   592→
+   593→      {/* ─── Next Exam Countdown + Study Streak ────────────── */}
+   594→      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+   595→        {/* Next Exam Countdown */}
+   596→        {isLoading ? (
+   597→          <Skeleton className="h-[120px] rounded-2xl" />
+   598→        ) : data?.nextExam ? (
+   599→          <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+   600→            <div className="pointer-events-none absolute -right-4 -top-4 size-20 rounded-full bg-gradient-to-br from-emerald-500/10 to-teal-500/5 blur-xl dark:from-emerald-500/5 dark:to-teal-500/5" />
+   601→            <div className="relative">
+   602→              <div className="mb-3 flex items-center gap-2">
+   603→                <Timer className="size-4 text-emerald-600 dark:text-emerald-400" />
+   604→                <h3 className="text-sm font-semibold text-foreground">Next Exam Countdown</h3>
+   605→              </div>
+   606→              <p className="mb-3 text-base font-semibold text-foreground">
+   607→                {data.nextExam.name}
+   608→              </p>
+   609→              {nextExamCountdown && !nextExamCountdown.isPast ? (
+   610→                <div className="flex items-center gap-4">
+   611→                  <div className="flex flex-col items-center rounded-xl bg-emerald-50 px-4 py-2.5 dark:bg-emerald-950/30">
+   612→                    <span className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+   613→                      {nextExamCountdown.days}
+   614→                    </span>
+   615→                    <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600/70 dark:text-emerald-400/70">
+   616→                      Days
+   617→                    </span>
+   618→                  </div>
+   619→                  <span className="text-lg font-light text-muted-foreground">:</span>
+   620→                  <div className="flex flex-col items-center rounded-xl bg-teal-50 px-4 py-2.5 dark:bg-teal-950/30">
+   621→                    <span className="text-2xl font-bold tabular-nums text-teal-700 dark:text-teal-300">
+   622→                      {nextExamCountdown.hours}
+   623→                    </span>
+   624→                    <span className="text-[10px] font-semibold uppercase tracking-wider text-teal-600/70 dark:text-teal-400/70">
+   625→                      Hours
+   626→                    </span>
+   627→                  </div>
+   628→                  <div className="ml-auto">
+   629→                    <Badge
+   630→                      variant={nextExamCountdown.days <= 7 ? 'destructive' : 'secondary'}
+   631→                      className="text-xs"
+   632→                    >
+   633→                      {formatDate(data.nextExam.examDate)}
+   634→                    </Badge>
+   635→                  </div>
+   636→                </div>
+   637→              ) : (
+   638→                <Badge variant="secondary">Date passed</Badge>
+   639→              )}
+   640→            </div>
+   641→          </div>
+   642→        ) : (
+   643→          <div className="flex items-center justify-center rounded-2xl border border-dashed border-border p-8 text-sm text-muted-foreground">
+   644→            No upcoming exams scheduled
+   645→          </div>
+   646→        )}
+   647→
+   648→        {/* Study Streak */}
+   649→        <div className="rounded-2xl border border-border/50 bg-card p-5 shadow-sm">
+   650→          <div className="mb-3 flex items-center gap-2">
+   651→            <Flame className="size-4 text-orange-500" />
+   652→            <h3 className="text-sm font-semibold text-foreground">Study Streak</h3>
+   653→            <span className="ml-auto text-xs font-medium text-muted-foreground">Last 7 days</span>
+   654→          </div>
+   655→          <div className="flex items-center justify-between gap-2">
+   656→            {weekDots.map((active, i) => (
+   657→              <div key={i} className="flex flex-col items-center gap-1.5">
+   658→                <div
+   659→                  className={cn(
+   660→                    'size-9 rounded-full transition-all duration-200 sm:size-10',
+   661→                    active
+   662→                      ? 'bg-gradient-to-br from-emerald-500 to-teal-400 shadow-md shadow-emerald-500/20 dark:from-emerald-600 dark:to-teal-500'
+   663→                      : 'bg-muted',
+   664→                    i === 6 && active && 'ring-2 ring-emerald-400/50 ring-offset-2 ring-offset-background dark:ring-emerald-500/30',
+   665→                  )}
+   666→                >
+   667→                  {active && (
+   668→                    <CheckCircle2 className="size-4 text-white sm:size-5 sm:p-0.5" />
+   669→                  )}
+   670→                </div>
+   671→                <span className={cn(
+   672→                  'text-[10px] font-medium',
+   673→                  i === 6 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground',
+   674→                )}>
+   675→                  {i === 6 ? 'Today' : getDayLabel(i)}
+   676→                </span>
+   677→              </div>
+   678→            ))}
+   679→          </div>
+   680→          <div className="mt-3 flex items-center gap-2 rounded-lg bg-orange-50 px-3 py-2 dark:bg-orange-950/20">
+   681→            <Zap className="size-3.5 text-orange-500" />
+   682→            <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+   683→              {weekDots.filter(Boolean).length} of 7 days active — keep it up!
+   684→            </span>
+   685→          </div>
+   686→        </div>
+   687→      </div>
+   688→
+   689→      {/* ─── Section Divider ────────────────────────────────── */}
+   690→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+   691→
+   692→      {/* ─── Quick Actions ──────────────────────────────────── */}
+   693→      <div>
+   694→        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+   695→          <Zap className="size-3.5" />
+   696→          Quick Actions
+   697→        </h2>
+   698→        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+   699→          <Button
+   700→            variant="outline"
+   701→            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+   702→            onClick={() => setAddExamOpen(true)}
+   703→          >
+   704→            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-teal-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-emerald-950/0 dark:to-teal-950/0" />
+   705→            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-500/20">
+   706→              <Plus className="size-5 text-white" />
+   707→            </div>
+   708→            <div className="relative text-center">
+   709→              <span className="text-sm font-semibold text-foreground">Add Exam</span>
+   710→              <p className="mt-0.5 text-[11px] text-muted-foreground">Record a new result</p>
+   711→            </div>
+   712→          </Button>
+   713→          <Button
+   714→            variant="outline"
+   715→            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-teal-300 hover:bg-teal-50 hover:shadow-md dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+   716→            onClick={() => navigate('upcoming')}
+   717→          >
+   718→            <div className="absolute inset-0 bg-gradient-to-br from-teal-50/0 to-cyan-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-teal-950/0 dark:to-cyan-950/0" />
+   719→            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 shadow-sm shadow-teal-500/20">
+   720→              <CalendarPlus className="size-5 text-white" />
+   721→            </div>
+   722→            <div className="relative text-center">
+   723→              <span className="text-sm font-semibold text-foreground">Schedule Exam</span>
+   724→              <p className="mt-0.5 text-[11px] text-muted-foreground">Plan your next attempt</p>
+   725→            </div>
+   726→          </Button>
+   727→          <Button
+   728→            variant="outline"
+   729→            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
+   730→            onClick={() => navigate('documents')}
+   731→          >
+   732→            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-teal-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-emerald-950/0 dark:to-teal-950/0" />
+   733→            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-500/20">
+   734→              <Upload className="size-5 text-white" />
+   735→            </div>
+   736→            <div className="relative text-center">
+   737→              <div className="flex items-center justify-center gap-1">
+   738→                <span className="text-sm font-semibold text-foreground">Upload Scorecard</span>
+   739→                <Badge className="bg-emerald-600 text-[9px] px-1.5 py-0">NEW</Badge>
+   740→              </div>
+   741→              <p className="mt-0.5 text-[11px] text-muted-foreground">Attach your score PDF</p>
+   742→            </div>
+   743→          </Button>
+   744→          <Button
+   745→            variant="outline"
+   746→            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-teal-300 hover:bg-teal-50 hover:shadow-md dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
+   747→            onClick={() => navigate('reflections')}
+   748→          >
+   749→            <div className="absolute inset-0 bg-gradient-to-br from-teal-50/0 to-cyan-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-teal-950/0 dark:to-cyan-950/0" />
+   750→            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 shadow-sm shadow-teal-500/20">
+   751→              <BookOpen className="size-5 text-white" />
+   752→            </div>
+   753→            <div className="relative text-center">
+   754→              <span className="text-sm font-semibold text-foreground">Add Reflection</span>
+   755→              <p className="mt-0.5 text-[11px] text-muted-foreground">Analyze your performance</p>
+   756→            </div>
+   757→          </Button>
+   758→        </div>
+   759→      </div>
+   760→
+   761→      {/* ─── Section Divider ────────────────────────────────── */}
+   762→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+   763→
+   764→      {/* ─── Score Trend ────────────────────────────────────── */}
+   765→      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
+   766→        <CardHeader className="flex flex-row items-center justify-between">
+   767→          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+   768→            <Activity className="size-4 text-emerald-600 dark:text-emerald-400" />
+   769→            Score Trend
+   770→          </CardTitle>
+   771→          <Button
+   772→            variant="ghost"
+   773→            size="sm"
+   774→            className="text-emerald-600 dark:text-emerald-400"
+   775→            onClick={() => navigate('analytics')}
+   776→          >
+   777→            View Analytics
+   778→            <ArrowRight className="ml-1 size-4" />
+   779→          </Button>
+   780→        </CardHeader>
+   781→        <CardContent>
+   782→          {isLoading ? (
+   783→            <Skeleton className="h-[280px] w-full rounded-lg" />
+   784→          ) : data && data.scoreTrend.length > 0 ? (
+   785→            <TrendLineChart
+   786→              data={data.scoreTrend}
+   787→              dataKey="score"
+   788→              xKey="name"
+   789→              height={280}
+   790→            />
+   791→          ) : (
+   792→            <div className="flex h-[200px] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+   793→              <BarChart3 className="size-8 text-muted-foreground/40" />
+   794→              No exam data yet. Add your first exam to see trends.
+   795→            </div>
+   796→          )}
+   797→        </CardContent>
+   798→      </Card>
+   799→
+   800→      {/* ─── Section Divider ────────────────────────────────── */}
+   801→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+   802→
+   803→      {/* ─── Two column grid: Weak Areas + Recent Activity ──── */}
+   804→      <div className="grid gap-6 lg:grid-cols-2">
+   805→        {/* Weak Areas */}
+   806→        <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
+   807→          <CardHeader className="flex flex-row items-center justify-between">
+   808→            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+   809→              <Target className="size-4 text-amber-500" />
+   810→              Weak Areas
+   811→            </CardTitle>
+   812→            <Button
+   813→              variant="ghost"
+   814→              size="sm"
+   815→              className="text-emerald-600 dark:text-emerald-400"
+   816→              onClick={() => navigate('weakness')}
+   817→            >
+   818→              Heatmap
+   819→              <ArrowRight className="ml-1 size-4" />
+   820→            </Button>
+   821→          </CardHeader>
+   822→          <CardContent className="space-y-4">
+   823→            {isLoading ? (
+   824→              Array.from({ length: 3 }).map((_, i) => (
+   825→                <div key={i} className="space-y-2">
+   826→                  <Skeleton className="h-4 w-24" />
+   827→                  <Skeleton className="h-2.5 w-full" />
+   828→                </div>
+   829→              ))
+   830→            ) : data && data.weakAreas.length > 0 ? (
+   831→              data.weakAreas.map((area, idx) => (
+   832→                <div key={area.section} className={cn('space-y-2 rounded-xl p-3 -mx-1 transition-colors', idx % 2 === 1 && 'bg-muted/30')}>
+   833→                  <div className="flex items-center justify-between">
+   834→                    <div className="flex items-center gap-2">
+   835→                      <span className={cn('size-2 rounded-full', getSeverityColor(area.avgScore))} />
+   836→                      <span className="text-sm font-medium text-foreground">
+   837→                        {area.section}
+   838→                      </span>
+   839→                      <Badge
+   840→                        variant="outline"
+   841→                        className={cn(
+   842→                          'text-[10px] px-1.5 py-0',
+   843→                          area.avgScore >= 60 && 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300',
+   844→                          area.avgScore >= 40 && area.avgScore < 60 && 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300',
+   845→                          area.avgScore < 40 && 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-300',
+   846→                        )}
+   847→                      >
+   848→                        {getSeverityLabel(area.avgScore)}
+   849→                      </Badge>
+   850→                    </div>
+   851→                    <span className="text-xs tabular-nums text-muted-foreground">
+   852→                      {area.avgScore}%
+   853→                    </span>
+   854→                  </div>
+   855→                  <ProgressBar
+   856→                    percent={area.avgScore}
+   857→                    color={
+   858→                      area.avgScore >= 60
+   859→                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 dark:from-emerald-600 dark:to-emerald-400'
+   860→                        : area.avgScore >= 40
+   861→                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 dark:from-amber-600 dark:to-amber-400'
+   862→                          : 'bg-gradient-to-r from-red-500 to-red-400 dark:from-red-600 dark:to-red-400'
+   863→                    }
+   864→                    height="h-2.5"
+   865→                    animated={area.avgScore < 60}
+   866→                    showPercentAtEnd
+   867→                  />
+   868→                  <p className="text-xs text-muted-foreground">
+   869→                    {area.avgScore >= 60
+   870→                      ? 'Good performance. Maintain consistency.'
+   871→                      : area.avgScore >= 40
+   872→                        ? 'Needs improvement. Practice more problems.'
+   873→                        : 'Critical area. Focus on fundamentals.'}
+   874→                    {' '}Across {area.exams} exam{area.exams !== 1 ? 's' : ''}.
+   875→                  </p>
+   876→                </div>
+   877→              ))
+   878→            ) : (
+   879→              <p className="text-sm text-muted-foreground">
+   880→                No weak areas identified yet.
+   881→              </p>
+   882→            )}
+   883→          </CardContent>
+   884→        </Card>
+   885→
+   886→        {/* Recent Activity Timeline */}
+   887→        <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
+   888→          <CardHeader className="flex flex-row items-center justify-between">
+   889→            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+   890→              <Clock className="size-4 text-emerald-600 dark:text-emerald-400" />
+   891→              Recent Activity
+   892→            </CardTitle>
+   893→            <Button
+   894→              variant="ghost"
+   895→              size="sm"
+   896→              className="text-emerald-600 dark:text-emerald-400"
+   897→              onClick={() => navigate('history')}
+   898→            >
+   899→              View All
+   900→              <ArrowRight className="ml-1 size-4" />
+   901→            </Button>
+   902→          </CardHeader>
+   903→          <CardContent>
+   904→            {isLoading ? (
+   905→              <div className="space-y-4">
+   906→                {Array.from({ length: 3 }).map((_, i) => (
+   907→                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
+   908→                ))}
+   909→              </div>
+   910→            ) : recentActivity.length > 0 ? (
+   911→              <div className="relative space-y-0">
+   912→                {/* Vertical timeline line */}
+   913→                <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
+   914→                {recentActivity.map((item, i) => {
+   915→                  const ItemIcon = item.icon;
+   916→                  return (
+   917→                    <div key={item.id} className="group relative flex gap-4 py-3">
+   918→                      {/* Timeline dot */}
+   919→                      <div
+   920→                        className={cn(
+   921→                          'relative z-10 mt-0.5 flex size-[30px] shrink-0 items-center justify-center rounded-full border-2 border-background',
+   922→                          item.type === 'success' && 'bg-emerald-500',
+   923→                          item.type === 'pending' && 'bg-amber-500',
+   924→                          item.type === 'info' && 'bg-muted-foreground/30',
+   925→                        )}
+   926→                      >
+   927→                        <ItemIcon className="size-3.5 text-white" />
+   928→                      </div>
+   929→                      {/* Content */}
+   930→                      <div className="min-w-0 flex-1 rounded-lg p-1 transition-colors group-hover:bg-muted/30">
+   931→                        <p className="text-sm font-medium text-foreground truncate">
+   932→                          {item.title}
+   933→                        </p>
+   934→                        <p className="text-xs text-muted-foreground truncate">
+   935→                          {item.description}
+   936→                        </p>
+   937→                        <p className="mt-1 text-[11px] text-muted-foreground/70">
+   938→                          {item.time}
+   939→                        </p>
+   940→                      </div>
+   941→                    </div>
+   942→                  );
+   943→                })}
+   944→              </div>
+   945→            ) : (
+   946→              <p className="text-sm text-muted-foreground">
+   947→                No recent activity to show.
+   948→              </p>
+   949→            )}
+   950→          </CardContent>
+   951→        </Card>
+   952→      </div>
+   953→
+   954→      {/* ─── Section Divider ────────────────────────────────── */}
+   955→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+   956→
+   957→      {/* ─── Upcoming Deadlines ─────────────────────────────── */}
+   958→      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
+   959→        <CardHeader className="flex flex-row items-center justify-between">
+   960→          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+   961→            <CalendarPlus className="size-4 text-teal-600 dark:text-teal-400" />
+   962→            Upcoming Deadlines
+   963→          </CardTitle>
+   964→          <Button
+   965→            variant="ghost"
+   966→            size="sm"
+   967→            className="text-emerald-600 dark:text-emerald-400"
+   968→            onClick={() => navigate('upcoming')}
+   969→          >
+   970→            Manage
+   971→            <ArrowRight className="ml-1 size-4" />
+   972→          </Button>
+   973→        </CardHeader>
+   974→        <CardContent>
+   975→          {isLoading ? (
+   976→            <div className="space-y-3">
+   977→              {Array.from({ length: 3 }).map((_, i) => (
+   978→                <Skeleton key={i} className="h-14 rounded-xl" />
+   979→              ))}
+   980→            </div>
+   981→          ) : data && data.upcomingDeadlines.length > 0 ? (
+   982→            <div className="space-y-3">
+   983→              {data.upcomingDeadlines.map((item) => (
+   984→                <div
+   985→                  key={item.id}
+   986→                  className="flex items-center justify-between rounded-xl border border-border/50 p-3.5 transition-all duration-200 hover:border-border hover:bg-muted/30 hover:shadow-sm"
+   987→                >
+   988→                  <div className="flex items-center gap-3">
+   989→                    <div
+   990→                      className={cn(
+   991→                        'flex size-10 items-center justify-center rounded-xl',
+   992→                        (item.daysLeft ?? 0) <= 7
+   993→                          ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
+   994→                          : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400',
+   995→                      )}
+   996→                    >
+   997→                      <Clock className="size-4" />
+   998→                    </div>
+   999→                    <div>
+  1000→                      <p className="text-sm font-medium">{item.name}</p>
+  1001→                      <p className="text-xs text-muted-foreground">
+  1002→                        {formatDate(item.examDate)}
+  1003→                      </p>
+  1004→                    </div>
+  1005→                  </div>
+  1006→                  <Badge
+  1007→                    variant={
+  1008→                      (item.daysLeft ?? 0) <= 7 ? 'destructive' : 'secondary'
+  1009→                    }
+  1010→                    className="rounded-lg text-xs font-medium"
+  1011→                  >
+  1012→                    {formatCountdown(item.daysLeft)}
+  1013→                  </Badge>
+  1014→                </div>
+  1015→              ))}
+  1016→            </div>
+  1017→          ) : (
+  1018→            <p className="text-sm text-muted-foreground">
+  1019→              No upcoming deadlines. Add exams to stay on track.
+  1020→            </p>
+  1021→          )}
+  1022→        </CardContent>
+  1023→      </Card>
+  1024→
+  1025→      {/* ─── Section Divider ────────────────────────────────── */}
+  1026→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+  1027→
+  1028→      {/* ─── Recent Exams Table ─────────────────────────────── */}
+  1029→      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
+  1030→        <CardHeader className="flex flex-row items-center justify-between">
+  1031→          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+  1032→            <GraduationCap className="size-4 text-emerald-600 dark:text-emerald-400" />
+  1033→            Recent Exams
+  1034→          </CardTitle>
+  1035→          <Button
+  1036→            variant="ghost"
+  1037→            size="sm"
+  1038→            className="text-emerald-600 dark:text-emerald-400"
+  1039→            onClick={() => navigate('history')}
+  1040→          >
+  1041→            View All
+  1042→            <ArrowRight className="ml-1 size-4" />
+  1043→          </Button>
+  1044→        </CardHeader>
+  1045→        <CardContent>
+  1046→          {isLoading ? (
+  1047→            <div className="space-y-3">
+  1048→              {Array.from({ length: 3 }).map((_, i) => (
+  1049→                <Skeleton key={i} className="h-12 w-full rounded-lg" />
+  1050→              ))}
+  1051→            </div>
+  1052→          ) : data && data.recentExams.length > 0 ? (
+  1053→            <Table>
+  1054→              <TableHeader>
+  1055→                <TableRow className="hover:bg-transparent">
+  1056→                  <TableHead>Exam</TableHead>
+  1057→                  <TableHead className="hidden sm:table-cell">Date</TableHead>
+  1058→                  <TableHead className="hidden md:table-cell">Category</TableHead>
+  1059→                  <TableHead className="text-right">Score</TableHead>
+  1060→                  <TableHead className="text-right">Result</TableHead>
+  1061→                </TableRow>
+  1062→              </TableHeader>
+  1063→              <TableBody>
+  1064→                {data.recentExams.map((exam) => (
+  1065→                  <TableRow
+  1066→                    key={exam.id}
+  1067→                    className="group transition-colors hover:bg-muted/50"
+  1068→                  >
+  1069→                    <TableCell className="font-medium">{exam.name}</TableCell>
+  1070→                    <TableCell className="hidden sm:table-cell text-muted-foreground">
+  1071→                      {formatDate(exam.date)}
+  1072→                    </TableCell>
+  1073→                    <TableCell className="hidden md:table-cell">
+  1074→                      <Badge
+  1075→                        variant="outline"
+  1076→                        className={cn(
+  1077→                          'border text-xs font-medium',
+  1078→                          categoryColors[exam.category] || categoryColors.Other,
+  1079→                        )}
+  1080→                      >
+  1081→                        {exam.category}
+  1082→                      </Badge>
+  1083→                    </TableCell>
+  1084→                    <TableCell className="text-right">
+  1085→                      <span className="font-bold tabular-nums">{exam.score}%</span>
+  1086→                    </TableCell>
+  1087→                    <TableCell className="text-right">
+  1088→                      <Badge
+  1089→                        className={cn(
+  1090→                          'border-0 text-xs font-medium',
+  1091→                          exam.result === 'Qualified'
+  1092→                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+  1093→                            : exam.result === 'Awaited'
+  1094→                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300'
+  1095→                              : 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+  1096→                        )}
+  1097→                      >
+  1098→                        {exam.result}
+  1099→                      </Badge>
+  1100→                    </TableCell>
+  1101→                  </TableRow>
+  1102→                ))}
+  1103→              </TableBody>
+  1104→            </Table>
+  1105→          ) : (
+  1106→            <div className="flex h-[120px] flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+  1107→              <GraduationCap className="size-8 text-muted-foreground/40" />
+  1108→              No exams recorded yet. Start by adding your first exam!
+  1109→            </div>
+  1110→          )}
+  1111→        </CardContent>
+  1112→      </Card>
+  1113→
+  1114→      {/* ─── Section Divider ────────────────────────────────── */}
+  1115→      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+  1116→
+  1117→      {/* ─── Smart Insights ─────────────────────────────────── */}
+  1118→      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
+  1119→        <CardHeader className="flex flex-row items-center justify-between">
+  1120→          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+  1121→            <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
+  1122→            Smart Insights
+  1123→          </CardTitle>
+  1124→          <Button
+  1125→            variant="ghost"
+  1126→            size="sm"
+  1127→            className="text-emerald-600 dark:text-emerald-400"
+  1128→            onClick={() => navigate('analytics')}
+  1129→          >
+  1130→            See All Insights
+  1131→            <ArrowRight className="ml-1 size-4" />
+  1132→          </Button>
+  1133→        </CardHeader>
+  1134→        <CardContent>
+  1135→          {isLoading ? (
+  1136→            <div className="space-y-3">
+  1137→              {Array.from({ length: 2 }).map((_, i) => (
+  1138→                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+  1139→              ))}
+  1140→            </div>
+  1141→          ) : data && data.smartInsights.length > 0 ? (
+  1142→            <ul className="space-y-3">
+  1143→              {data.smartInsights.map((insight, i) => (
+  1144→                <li
+  1145→                  key={i}
+  1146→                  className="flex items-start gap-3 rounded-xl border border-border/50 p-3.5 transition-all duration-200 hover:border-border hover:bg-muted/30 hover:shadow-sm"
+  1147→                >
+  1148→                  <div className={cn(
+  1149→                    'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl',
+  1150→                    insight.includes('improvement') || insight.includes('momentum')
+  1151→                      ? 'bg-emerald-100 dark:bg-emerald-900/40'
+  1152→                      : insight.includes('⚠️')
+  1153→                        ? 'bg-amber-100 dark:bg-amber-900/40'
+  1154→                        : insight.includes('weak') || insight.includes('dipped')
+  1155→                          ? 'bg-red-100 dark:bg-red-900/40'
+  1156→                          : 'bg-emerald-100 dark:bg-emerald-900/40',
+  1157→                  )}>
+  1158→                    {insight.includes('improvement') || insight.includes('momentum') ? (
+  1159→                      <TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />
+  1160→                    ) : insight.includes('⚠️') ? (
+  1161→                      <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
+  1162→                    ) : insight.includes('weak') || insight.includes('dipped') ? (
+  1163→                      <Target className="size-4 text-red-600 dark:text-red-400" />
+  1164→                    ) : (
+  1165→                      <Lightbulb className="size-4 text-emerald-600 dark:text-emerald-400" />
+  1166→                    )}
+  1167→                  </div>
+  1168→                  <p className="text-sm leading-relaxed text-foreground">
+  1169→                    {insight}
+  1170→                  </p>
+  1171→                </li>
+  1172→              ))}
+  1173→            </ul>
+  1174→          ) : (
+  1175→            <p className="text-sm text-muted-foreground">
+  1176→              Add more exam data to generate personalized insights.
+  1177→            </p>
+  1178→          )}
+  1179→        </CardContent>
+  1180→      </Card>
+  1181→
+  1182→      {/* ─── View Full Analytics ────────────────────────────── */}
+  1183→      <div className="flex justify-center">
+  1184→        <Button
+  1185→          variant="outline"
+  1186→          className="gap-2 rounded-xl border-emerald-200 px-6 py-2.5 text-emerald-700 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:bg-emerald-50 hover:shadow-md hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-300"
+  1187→          onClick={() => navigate('analytics')}
+  1188→        >
+  1189→          <BarChart3 className="size-4" />
+  1190→          View Full Analytics
+  1191→          <ArrowRight className="size-4" />
+  1192→        </Button>
+  1193→      </div>
+  1194→
+  1195→      {/* ─── Floating Action Button (Mobile) ────────────────── */}
+  1196→      <button
+  1197→        onClick={() => setAddExamOpen(true)}
+  1198→        className="fixed bottom-6 right-6 z-50 flex size-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-600 to-teal-600 text-white shadow-lg shadow-emerald-600/30 transition-all duration-200 hover:scale-110 hover:shadow-xl hover:shadow-emerald-600/40 active:scale-95 md:hidden"
+  1199→        aria-label="Add Exam"
+  1200→      >
+  1201→        <Plus className="size-6" />
+  1202→      </button>
+  1203→
+  1204→      {/* Add Exam Dialog */}
+  1205→      <AddExamDialog open={addExamOpen} onOpenChange={setAddExamOpen} />
+  1206→    </div>
+  1207→  );
+  1208→}

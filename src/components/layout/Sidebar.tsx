@@ -15,6 +15,7 @@ import {
   LogOut,
   GraduationCap,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,7 @@ const NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: 'documents', label: 'Documents', icon: FolderOpen },
   { id: 'goals', label: 'Goals & Plans', icon: Target },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
+  { id: 'journal', label: 'Journal', icon: BookOpen },
 ];
 
 const FOOTER_ITEMS: {

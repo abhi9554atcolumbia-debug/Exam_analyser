@@ -50,6 +50,7 @@ model User {
   notifications  Notification[]
   devices        Device[]
   settings       UserSettings?
+  journalEntries JournalEntry[]
 }
 
 model UserSettings {
@@ -322,4 +323,22 @@ model StudyStreak {
   weekDots       String   @default("") // "1,0,1,1,0,1,1" for 7 days
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// ─── Journal Entries ──────────────────────────────────────────────
+
+model JournalEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  date        DateTime @unique
+  mood        String   @default("neutral")  // happy, motivated, tired, anxious, neutral, frustrated
+  content     String
+  studyHours  Float?   // hours studied that day
+  topics      String?  // comma-separated topics studied
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
 }

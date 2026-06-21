@@ -532,3 +532,102 @@ Work Log:
 8. Add loading skeletons to all pages that fetch data
 9. Add automated E2E testing (Playwright)
 10. Performance optimization: query deduplication, caching strategies
+
+---
+Task ID: fix-seed-dates
+Agent: Main Developer
+Task: Fix all seed data dates from 2025 to 2026 (system date is June 21, 2026)
+
+Work Log:
+- Updated user targetYear from "2025" to "2026"
+- Updated 4 upcoming exams (up-001 to up-004): dates from 2025-08/09/10/11 to 2026-08/09/10/11, names from 2025 to 2026, daysLeft recalculated (58, 86, 121, 142)
+- Updated doc-006: name, examName, year from 2025 to 2026
+- Updated all 12 goals (goal-001 to goal-012): all dueDate, completedAt, and linkedExam fields from 2025 to 2026
+- Updated 2 calendar event labels (cal-001, cal-006): "IBPS PO Prelims 2025" → "2026", "SSC CGL Tier 1 2025" → "2026"
+- Updated notification notif-005 message: "SSC CGL Tier 1 2025" → "2026"
+- Ran `bun run prisma/seed.ts` — seed completed successfully (15 exams, 4 upcoming, 8 reflections, 8 docs, 12 goals, 15 calendar events, 3 reminders, 8 notifications, 4 devices)
+- Verified `/api/upcoming-exams` returns all 4 exams with 2026 dates
+- Verified `/api/goals/stats` returns 8 active goals (was 0 before fix), nextDueGoal = "Complete DI Practice Set" (2026-07-20)
+- Ran lint: 0 errors (1 pre-existing warning in upload/ directory)
+- All zero-match verification: no "2025" string remaining in seed.ts
+
+---
+Task ID: feat-pomodoro-zod
+Agent: Main Developer
+Task: Pomodoro Timer Widget + Zod Validation Extension
+
+Work Log:
+- Created `/src/components/PomodoroTimer.tsx` — floating Pomodoro/Study Timer widget
+  - Client-side component with useState/useEffect for timer logic
+  - States: idle, running, paused, break
+  - Presets: 25m focus, 5m short break, 15m long break
+  - Circular SVG progress ring showing remaining time
+  - Large MM:SS display with tabular-nums font
+  - Start/Pause/Reset/Skip-to-Break controls
+  - Session counter with emerald dots (completed pomodoros)
+  - Web Audio API beep notification when timer ends
+  - Minimizes to small floating button with timer badge
+  - Fixed position bottom-right with emerald gradient
+  - Dark mode support, smooth transitions
+- Integrated PomodoroTimer into AppLayout.tsx (after CommandSearch)
+- Updated `/src/lib/validations.ts` with Zod schemas:
+  - goalFormSchema: title (3-100 chars), priority (required), dueDate (required), description/subject/linkedExam (optional)
+  - reflectionFormSchema: examId, difficulty, confidence (0-100), emotionalState, whatWentWell (5+), whatWentWrong (5+), biggestLesson (3+), actionPlan, targetScore (optional)
+  - documentFormSchema: name (3+), category (required), type/description/linkedExam (optional)
+- Added Zod validation to GoalsPage create dialog:
+  - Import goalFormSchema, added formErrors state
+  - handleCreate uses safeParse with field error extraction
+  - Error messages displayed below title, subject, dueDate, description fields
+  - onChange handlers clear specific field errors
+- Added Zod validation to ReflectionsPage create dialog:
+  - Import reflectionFormSchema, added formErrors state
+  - handleSubmit uses safeParse with field error extraction
+  - Error messages for examId, difficulty, emotionalState, whatWentWell, whatWentWrong, biggestLesson, targetScore
+  - onChange handlers clear specific field errors
+- Added Zod validation to DocumentsPage create dialog:
+  - Import documentFormSchema, added formErrors state
+  - handleSubmit uses safeParse with field error extraction
+  - Error messages for name, category
+  - onChange handlers clear specific field errors
+- Ran lint: 0 errors (1 pre-existing warning in upload/ directory)
+- Dev server verified: all API endpoints returning 200, page loads successfully
+
+---
+Task ID: feat-daily-journal
+Agent: Main Developer
+Task: Add a Daily Journal/Notes feature
+
+Work Log:
+- Updated Prisma schema with JournalEntry model (id, userId, date, mood, content, studyHours, topics, timestamps, relation to User)
+- Added `journalEntries` relation to User model
+- Pushed schema to SQLite database with `bunx prisma db push`
+- Created API route `/api/journal/route.ts`:
+  - GET: Fetches journal entries with month/year/limit filters, ordered by date desc
+  - POST: Creates new entry with upsert logic (updates if entry exists for same date)
+- Created API route `/api/journal/[date]/route.ts`:
+  - GET: Fetches single entry by date (YYYY-MM-DD)
+  - PUT: Updates entry by date
+  - DELETE: Deletes entry by date
+- Added API client functions to `src/lib/api.ts`:
+  - `getJournalEntries()`, `createJournalEntry()`, `updateJournalEntry()`, `deleteJournalEntry()`
+  - `JournalEntry` interface type
+- Created `src/components/pages/JournalPage.tsx`:
+  - Full journal page with header, new entry button, mood selector (6 moods with emoji/color coding)
+  - Entry form dialog with date picker, mood selector, textarea, study hours, topics input
+  - Entry list as responsive card grid with date/mood/content/study hours/topics badges
+  - Stats sidebar: monthly entries count, average study hours, most common mood, study streak
+  - Monthly calendar strip with dot indicators for days with entries
+  - Empty state with CTA to write first entry
+  - Emerald theme, dark mode support, hover effects, transitions
+- Added 'journal' to PageId type in navigation store
+- Added journal nav item to Sidebar (BookOpen icon, placed after Calendar)
+- Added journal PAGE_META to Topbar
+- Added journal entry to CommandSearch pages list
+- Added JournalPage import and route to page.tsx PAGE_COMPONENTS
+- Added "Write Journal" quick action button to DashboardPage
+- Added 7 journal seed entries for June 2026 with varied moods and content
+- Added `db.journalEntry.deleteMany()` to seed cleanup
+- Fixed pre-existing bug: PomodoroTimer.tsx importing non-existent `Minus2` from lucide-react (changed to `Minus`)
+- Ran seed successfully: 7 journal entries created
+- Ran lint: 0 errors (1 pre-existing warning in upload/ directory)
+

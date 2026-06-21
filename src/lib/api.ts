@@ -256,4 +256,32 @@ export interface Plan { name: string; tagline: string; price: string; period: st
 export async function getPlans() { return request<Plan[]>('/plans'); }
 export async function getSubscription() { return request<{ plan: string; expiry: string | null }>('/subscription'); }
 
+// ─── Journal ───────────────────────────────────────────────
+export interface JournalEntry {
+  id: string; date: string; mood: string; content: string;
+  studyHours: number | null; topics: string | null;
+  createdAt: string; updatedAt: string;
+}
+
+export async function getJournalEntries(params?: { month?: number; year?: number; limit?: number }) {
+  const sp = new URLSearchParams();
+  if (params?.month) sp.set('month', String(params.month));
+  if (params?.year) sp.set('year', String(params.year));
+  if (params?.limit) sp.set('limit', String(params.limit));
+  const qs = sp.toString();
+  return request<JournalEntry[]>(`/journal${qs ? `?${qs}` : ''}`);
+}
+
+export async function createJournalEntry(data: { date: string; mood: string; content: string; studyHours?: number; topics?: string }) {
+  return request<JournalEntry>('/journal', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function updateJournalEntry(date: string, data: Partial<JournalEntry>) {
+  return request<JournalEntry>(`/journal/${date}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+export async function deleteJournalEntry(date: string) {
+  return request(`/journal/${date}`, { method: 'DELETE' });
+}
+
 export { ApiError };

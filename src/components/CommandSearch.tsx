@@ -20,6 +20,7 @@ import {
   GraduationCap,
   Search,
   CornerDownLeft,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -54,6 +55,7 @@ const PAGES: PageEntry[] = [
   { id: 'documents', label: 'Documents', subtitle: 'Manage your study materials', icon: FolderOpen },
   { id: 'goals', label: 'Goals & Plans', subtitle: 'Track your study goals and plans', icon: Target },
   { id: 'calendar', label: 'Calendar', subtitle: 'Your exam and study schedule', icon: Calendar },
+  { id: 'journal', label: 'Journal', subtitle: 'Daily study notes', icon: BookOpen },
   { id: 'profile', label: 'Profile', subtitle: 'Manage your account settings', icon: User },
   { id: 'settings', label: 'Settings', subtitle: 'Customize your experience', icon: Settings },
   { id: 'help', label: 'Help Center', subtitle: 'Find answers and get support', icon: HelpCircle },

@@ -125,6 +125,12 @@ const PAGE_META: Record<
     showSearch: false,
     showAdd: false,
   },
+  journal: {
+    title: 'Journal',
+    subtitle: 'Record your daily study progress',
+    showSearch: false,
+    showAdd: false,
+  },
   profile: {
     title: 'Profile',
     subtitle: 'Manage your account settings',
