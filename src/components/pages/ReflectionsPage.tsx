@@ -22,11 +22,17 @@ import {
   Target,
   Heart,
   Sparkles,
+  TrendingUp,
+  TrendingDown,
+  ArrowRight,
+  BarChart3,
+  Eye,
 } from 'lucide-react';
 import { useNavigationStore } from '@/store/navigation';
 import {
   getReflectionExamOptions,
   getReflections,
+  getExams,
   getExam,
   createReflection,
   type Reflection,
@@ -118,8 +124,139 @@ function EmptyReflectionState({ onCreateClick }: { onCreateClick: () => void }) 
   );
 }
 
+// ── Section Analysis Cards ─────────────────────────────────
+function SectionAnalysisCards({ sections }: { sections: Reflection['sections'] }) {
+  if (!sections || sections.length === 0) return null;
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">
+        <BarChart3 className="inline h-3 w-3 mr-1" />Section Analysis
+      </p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {sections.map((sec) => {
+          const pct = sec.score != null ? Math.round(sec.score) : null;
+          const isStrong = pct != null && pct >= 60;
+          const isWeak = pct != null && pct < 40;
+          return (
+            <div
+              key={sec.id}
+              className={cn(
+                'rounded-lg border p-3 transition-all duration-200',
+                isWeak
+                  ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20'
+                  : isStrong
+                    ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20'
+                    : 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20',
+              )}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-foreground">{sec.section}</span>
+                {pct != null && (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'text-[10px] font-bold border-0',
+                      isWeak
+                        ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
+                        : isStrong
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300'
+                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
+                    )}
+                  >
+                    {pct}%
+                  </Badge>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                {sec.strength && (
+                  <div className="flex items-start gap-1.5">
+                    <TrendingUp className="mt-0.5 size-3 flex-shrink-0 text-emerald-500" />
+                    <p className="text-[11px] text-muted-foreground line-clamp-1">{sec.strength}</p>
+                  </div>
+                )}
+                {sec.weakness && (
+                  <div className="flex items-start gap-1.5">
+                    <TrendingDown className="mt-0.5 size-3 flex-shrink-0 text-red-500" />
+                    <p className="text-[11px] text-muted-foreground line-clamp-1">{sec.weakness}</p>
+                  </div>
+                )}
+                {sec.actionPlan && (
+                  <div className="flex items-start gap-1.5">
+                    <Target className="mt-0.5 size-3 flex-shrink-0 text-teal-500" />
+                    <p className="text-[11px] text-muted-foreground line-clamp-1">{sec.actionPlan}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Similar Exam Comparison Suggestion ─────────────────────
+function SimilarExamSuggestion({
+  reflection,
+  allReflections,
+}: {
+  reflection: Reflection;
+  allReflections: Reflection[];
+}) {
+  // Find similar exam by category/result
+  const similar = allReflections.find(
+    (r) =>
+      r.id !== reflection.id &&
+      r.result === reflection.result &&
+      r.score !== null &&
+      reflection.score !== null &&
+      Math.abs(r.score - reflection.score) <= 10,
+  );
+
+  if (!similar) return null;
+
+  const isBetter = (similar.score ?? 0) > (reflection.score ?? 0);
+
+  return (
+    <div className="mt-3 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/30 p-3 dark:border-emerald-800 dark:bg-emerald-950/10">
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <Eye className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Similar Exam Comparison</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-foreground truncate">{similar.examName}</p>
+          <p className="text-[10px] text-muted-foreground">
+            Score: {similar.score ?? '—'} · {similar.result}
+          </p>
+        </div>
+        <div className="flex flex-col items-center">
+          <span
+            className={cn(
+              'text-lg font-bold',
+              isBetter ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400',
+            )}
+          >
+            {isBetter ? '↓' : '↑'}
+          </span>
+          <span className="text-[9px] text-muted-foreground">
+            {Math.abs((similar.score ?? 0) - (reflection.score ?? 0)).toFixed(0)} pts
+          </span>
+        </div>
+        <ArrowRight className="size-3.5 text-muted-foreground flex-shrink-0" />
+      </div>
+      <p className="mt-1.5 text-[11px] text-muted-foreground">
+        {isBetter
+          ? 'This exam scored higher. Review what worked there for improvement insights.'
+          : 'Your current exam performed better! Keep building on these strengths.'}
+      </p>
+    </div>
+  );
+}
+
 // ── Reflection Card ──────────────────────────────────────────
-function ReflectionCard({ reflection }: { reflection: Reflection }) {
+function ReflectionCard({ reflection, allReflections }: { reflection: Reflection; allReflections: Reflection[] }) {
   const [expanded, setExpanded] = useState(false);
 
   const emotionalCfg = EMOTIONAL_CONFIG[reflection.emotionalState ?? ''] ?? EMOTIONAL_CONFIG.Neutral;
@@ -321,6 +458,12 @@ function ReflectionCard({ reflection }: { reflection: Reflection }) {
             ))}
           </div>
         )}
+
+        {/* Section Analysis Cards */}
+        <SectionAnalysisCards sections={reflection.sections} />
+
+        {/* Similar Exam Comparison */}
+        <SimilarExamSuggestion reflection={reflection} allReflections={allReflections} />
       </CardContent>
     </Card>
   );
@@ -783,7 +926,7 @@ export default function ReflectionsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {existingReflections.map((r) => (
-            <ReflectionCard key={r.id} reflection={r} />
+            <ReflectionCard key={r.id} reflection={r} allReflections={existingReflections} />
           ))}
         </div>
       )}

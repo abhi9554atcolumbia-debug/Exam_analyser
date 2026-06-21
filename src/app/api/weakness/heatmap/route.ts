@@ -47,7 +47,7 @@ export async function GET() {
       const avgScore = subjectMap[subject].reduce((a, b) => a + b, 0) / subjectMap[subject].length
       const inversion = Math.round((100 - avgScore)) // lower avg score = higher weakness
 
-      const row: Record<string, number> = { subject, overall: inversion }
+      const row: Record<string, string | number> = { subject, overall: inversion }
 
       for (const col of WEAKNESS_COLUMNS) {
         const count = subjectTagCounts[subject][col] || 0
@@ -63,7 +63,7 @@ export async function GET() {
 
     // Normalize overall to be average of all weakness columns
     for (const row of heatmap) {
-      const cols = WEAKNESS_COLUMNS.map(c => row[c])
+      const cols = WEAKNESS_COLUMNS.map(c => Number(row[c]) || 0)
       row.overall = Math.round(cols.reduce((a, b) => a + b, 0) / cols.length)
     }
 

@@ -1,0 +1,798 @@
+     1→'use client';
+     2→
+     3→import { useState, useCallback } from 'react';
+     4→import {
+     5→  useQuery,
+     6→  useMutation,
+     7→  useQueryClient,
+     8→} from '@tanstack/react-query';
+     9→import { toast } from 'sonner';
+    10→import {
+    11→  Plus,
+    12→  FileText,
+    13→  Smile,
+    14→  Frown,
+    15→  Meh,
+    16→  Angry,
+    17→  ChevronDown,
+    18→  ChevronUp,
+    19→  PenLine,
+    20→  BookOpen,
+    21→  BrainCircuit,
+    22→  Target,
+    23→  Heart,
+    24→  Sparkles,
+    25→} from 'lucide-react';
+    26→import { useNavigationStore } from '@/store/navigation';
+    27→import {
+    28→  getReflectionExamOptions,
+    29→  getReflections,
+    30→  getExam,
+    31→  createReflection,
+    32→  type Reflection,
+    33→  type Exam,
+    34→} from '@/lib/api';
+    35→
+    36→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    37→import { Button } from '@/components/ui/button';
+    38→import { Label } from '@/components/ui/label';
+    39→import { Input } from '@/components/ui/input';
+    40→import { Textarea } from '@/components/ui/textarea';
+    41→import { Slider } from '@/components/ui/slider';
+    42→import { Badge } from '@/components/ui/badge';
+    43→import { Skeleton } from '@/components/ui/skeleton';
+    44→import { Separator } from '@/components/ui/separator';
+    45→import { cn } from '@/lib/utils';
+    46→import { reflectionFormSchema } from '@/lib/validations';
+    47→import {
+    48→  Select,
+    49→  SelectContent,
+    50→  SelectItem,
+    51→  SelectTrigger,
+    52→  SelectValue,
+    53→} from '@/components/ui/select';
+    54→import {
+    55→  Dialog,
+    56→  DialogContent,
+    57→  DialogHeader,
+    58→  DialogTitle,
+    59→  DialogTrigger,
+    60→  DialogFooter,
+    61→  DialogDescription,
+    62→} from '@/components/ui/dialog';
+    63→
+    64→// ── Constants ────────────────────────────────────────────────
+    65→const DIFFICULTY_OPTIONS = ['Easy', 'Moderate', 'Hard', 'Very Hard'];
+    66→const EMOTIONAL_OPTIONS = ['Confident', 'Anxious', 'Neutral', 'Disappointed'];
+    67→
+    68→const EMOTIONAL_CONFIG: Record<string, { icon: React.ElementType; cls: string; bg: string }> = {
+    69→  Confident: {
+    70→    icon: Smile,
+    71→    cls: 'text-emerald-700 dark:text-emerald-300',
+    72→    bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+    73→  },
+    74→  Anxious: {
+    75→    icon: Frown,
+    76→    cls: 'text-amber-700 dark:text-amber-300',
+    77→    bg: 'bg-amber-100 dark:bg-amber-900/50',
+    78→  },
+    79→  Neutral: {
+    80→    icon: Meh,
+    81→    cls: 'text-slate-700 dark:text-slate-300',
+    82→    bg: 'bg-slate-100 dark:bg-slate-900/50',
+    83→  },
+    84→  Disappointed: {
+    85→    icon: Angry,
+    86→    cls: 'text-rose-700 dark:text-rose-300',
+    87→    bg: 'bg-rose-100 dark:bg-rose-900/50',
+    88→  },
+    89→};
+    90→
+    91→const DIFFICULTY_CONFIG: Record<string, { cls: string; border: string }> = {
+    92→  Easy: { cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800', border: 'border-l-emerald-500' },
+    93→  Moderate: { cls: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-800', border: 'border-l-amber-500' },
+    94→  Hard: { cls: 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 border-orange-200 dark:border-orange-800', border: 'border-l-orange-500' },
+    95→  'Very Hard': { cls: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800', border: 'border-l-red-500' },
+    96→};
+    97→
+    98→// ── Empty State ──────────────────────────────────────────────
+    99→function EmptyReflectionState({ onCreateClick }: { onCreateClick: () => void }) {
+   100→  return (
+   101→    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-muted-foreground/25 bg-muted/30 px-6 py-16 text-center">
+   102→      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/40">
+   103→        <PenLine className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
+   104→      </div>
+   105→      <h3 className="mb-2 text-lg font-semibold text-foreground">No Reflections Yet</h3>
+   106→      <p className="max-w-md text-sm text-muted-foreground">
+   107→        Reflections help you learn from each exam. Track what went well, identify mistakes,
+   108→        and create action plans to improve your performance.
+   109→      </p>
+   110→      <Button
+   111→        className="mt-6 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
+   112→        onClick={onCreateClick}
+   113→      >
+   114→        <Plus className="mr-2 h-4 w-4" />
+   115→        Write Your First Reflection
+   116→      </Button>
+   117→    </div>
+   118→  );
+   119→}
+   120→
+   121→// ── Reflection Card ──────────────────────────────────────────
+   122→function ReflectionCard({ reflection }: { reflection: Reflection }) {
+   123→  const [expanded, setExpanded] = useState(false);
+   124→
+   125→  const emotionalCfg = EMOTIONAL_CONFIG[reflection.emotionalState ?? ''] ?? EMOTIONAL_CONFIG.Neutral;
+   126→  const diffCfg = DIFFICULTY_CONFIG[reflection.difficulty ?? ''] ?? null;
+   127→  const EmotionIcon = emotionalCfg.icon;
+   128→
+   129→  const hasContent =
+   130→    reflection.whatWentWell || reflection.whatWentWrong || reflection.biggestLesson || reflection.actionPlan;
+   131→  const contentLength = [
+   132→    reflection.whatWentWell,
+   133→    reflection.whatWentWrong,
+   134→    reflection.biggestLesson,
+   135→    reflection.actionPlan,
+   136→  ].filter(Boolean).join('').length;
+   137→  const isLong = contentLength > 300;
+   138→
+   139→  return (
+   140→    <Card
+   141→      className={cn(
+   142→        'border-l-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
+   143→        diffCfg?.border ?? 'border-l-slate-300 dark:border-l-slate-700',
+   144→      )}
+   145→    >
+   146→      <CardContent className="p-4">
+   147→        {/* Header */}
+   148→        <div className="flex items-start justify-between gap-3">
+   149→          <div className="flex items-center gap-3 min-w-0">
+   150→            <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg', emotionalCfg.bg)}>
+   151→              <EmotionIcon className={cn('h-5 w-5', emotionalCfg.cls)} />
+   152→            </div>
+   153→            <div className="min-w-0">
+   154→              <h3 className="text-sm font-semibold text-foreground truncate">
+   155→                {reflection.examName}
+   156→              </h3>
+   157→              <p className="text-xs text-muted-foreground">
+   158→                {reflection.examDate
+   159→                  ? new Date(reflection.examDate).toLocaleDateString('en-IN', {
+   160→                      day: 'numeric',
+   161→                      month: 'short',
+   162→                      year: 'numeric',
+   163→                    })
+   164→                  : 'No date'}
+   165→                {reflection.score != null && ` · Score: ${reflection.score}`}
+   166→                {reflection.result && (
+   167→                  <span
+   168→                    className={cn(
+   169→                      'ml-1 font-medium',
+   170→                      reflection.result.toLowerCase().includes('qualified')
+   171→                        ? 'text-emerald-600 dark:text-emerald-400'
+   172→                        : 'text-red-600 dark:text-red-400',
+   173→                    )}
+   174→                  >
+   175→                    · {reflection.result}
+   176→                  </span>
+   177→                )}
+   178→              </p>
+   179→            </div>
+   180→          </div>
+   181→          <div className="flex items-center gap-2 flex-shrink-0">
+   182→            {reflection.difficulty && (
+   183→              <Badge variant="outline" className={cn('border text-[11px] font-semibold', diffCfg?.cls)}>
+   184→                {reflection.difficulty}
+   185→              </Badge>
+   186→            )}
+   187→            <Badge variant="secondary" className={cn('text-[11px] font-medium', emotionalCfg.bg, emotionalCfg.cls)}>
+   188→              <EmotionIcon className="mr-1 h-3 w-3" />
+   189→              {reflection.emotionalState}
+   190→            </Badge>
+   191→          </div>
+   192→        </div>
+   193→
+   194→        {/* Confidence */}
+   195→        {reflection.confidence != null && (
+   196→          <div className="mt-3">
+   197→            <div className="flex items-center justify-between text-xs mb-1">
+   198→              <span className="text-muted-foreground">Confidence Level</span>
+   199→              <span className={cn(
+   200→                'font-semibold',
+   201→                reflection.confidence >= 70
+   202→                  ? 'text-emerald-600 dark:text-emerald-400'
+   203→                  : reflection.confidence >= 40
+   204→                    ? 'text-amber-600 dark:text-amber-400'
+   205→                    : 'text-red-600 dark:text-red-400',
+   206→              )}>
+   207→                {reflection.confidence}%
+   208→              </span>
+   209→            </div>
+   210→            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+   211→              <div
+   212→                className={cn(
+   213→                  'h-full rounded-full transition-all duration-500',
+   214→                  reflection.confidence >= 70
+   215→                    ? 'bg-emerald-500'
+   216→                    : reflection.confidence >= 40
+   217→                      ? 'bg-amber-500'
+   218→                      : 'bg-red-500',
+   219→                )}
+   220→                style={{ width: `${reflection.confidence}%` }}
+   221→              />
+   222→            </div>
+   223→          </div>
+   224→        )}
+   225→
+   226→        {/* Content sections */}
+   227→        {hasContent && (
+   228→          <div className={cn('mt-3 space-y-2', !expanded && isLong && 'max-h-40 overflow-hidden relative')}>
+   229→            {reflection.whatWentWell && (
+   230→              <div>
+   231→                <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-0.5">
+   232→                  <Smile className="inline h-3 w-3 mr-1" />What Went Well
+   233→                </p>
+   234→                <p className="text-sm text-muted-foreground leading-relaxed">
+   235→                  {reflection.whatWentWell}
+   236→                </p>
+   237→              </div>
+   238→            )}
+   239→            {reflection.whatWentWrong && (
+   240→              <div>
+   241→                <p className="text-[11px] font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-0.5">
+   242→                  <Frown className="inline h-3 w-3 mr-1" />What Went Wrong
+   243→                </p>
+   244→                <p className="text-sm text-muted-foreground leading-relaxed">
+   245→                  {reflection.whatWentWrong}
+   246→                </p>
+   247→              </div>
+   248→            )}
+   249→            {reflection.biggestLesson && (
+   250→              <div>
+   251→                <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400 mb-0.5">
+   252→                  <Sparkles className="inline h-3 w-3 mr-1" />Biggest Lesson
+   253→                </p>
+   254→                <p className="text-sm text-muted-foreground leading-relaxed">
+   255→                  {reflection.biggestLesson}
+   256→                </p>
+   257→              </div>
+   258→            )}
+   259→            {reflection.actionPlan && (
+   260→              <div>
+   261→                <p className="text-[11px] font-semibold uppercase tracking-wider text-teal-600 dark:text-teal-400 mb-0.5">
+   262→                  <Target className="inline h-3 w-3 mr-1" />Action Plan
+   263→                </p>
+   264→                <p className="text-sm text-muted-foreground leading-relaxed">
+   265→                  {reflection.actionPlan}
+   266→                </p>
+   267→              </div>
+   268→            )}
+   269→            {!expanded && isLong && (
+   270→              <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-background to-transparent" />
+   271→            )}
+   272→          </div>
+   273→        )}
+   274→
+   275→        {/* Target Score & Footer */}
+   276→        <div className="mt-3 flex items-center justify-between">
+   277→          {reflection.targetScore != null && (
+   278→            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+   279→              <Target className="h-3.5 w-3.5" />
+   280→              <span>Target: <span className="font-semibold text-foreground">{reflection.targetScore}</span></span>
+   281→            </div>
+   282→          )}
+   283→          {isLong && (
+   284→            <Button
+   285→              variant="ghost"
+   286→              size="sm"
+   287→              className="h-7 px-2 text-xs text-muted-foreground"
+   288→              onClick={() => setExpanded(!expanded)}
+   289→            >
+   290→              {expanded ? (
+   291→                <>
+   292→                  <ChevronUp className="mr-1 h-3 w-3" /> Show Less
+   293→                </>
+   294→              ) : (
+   295→                <>
+   296→                  <ChevronDown className="mr-1 h-3 w-3" /> Show More
+   297→                </>
+   298→              )}
+   299→            </Button>
+   300→          )}
+   301→        </div>
+   302→
+   303→        {/* Mistake Tags */}
+   304→        {reflection.mistakeTags && (
+   305→          <div className="mt-2 flex flex-wrap gap-1">
+   306→            {reflection.mistakeTags.split(',').filter(Boolean).map((tag) => (
+   307→              <Badge key={tag} variant="outline" className="text-[10px] border-rose-200 text-rose-600 dark:border-rose-800 dark:text-rose-400">
+   308→                {tag}
+   309→              </Badge>
+   310→            ))}
+   311→          </div>
+   312→        )}
+   313→
+   314→        {/* Strength Tags */}
+   315→        {reflection.strengthTags && (
+   316→          <div className="mt-1.5 flex flex-wrap gap-1">
+   317→            {reflection.strengthTags.split(',').filter(Boolean).map((tag) => (
+   318→              <Badge key={tag} variant="outline" className="text-[10px] border-emerald-200 text-emerald-600 dark:border-emerald-800 dark:text-emerald-400">
+   319→                {tag}
+   320→              </Badge>
+   321→            ))}
+   322→          </div>
+   323→        )}
+   324→      </CardContent>
+   325→    </Card>
+   326→  );
+   327→}
+   328→
+   329→// ── Create Reflection Dialog ─────────────────────────────────
+   330→function CreateReflectionDialog({
+   331→  open,
+   332→  onOpenChange,
+   333→}: {
+   334→  open: boolean;
+   335→  onOpenChange: (open: boolean) => void;
+   336→}) {
+   337→  const queryClient = useQueryClient();
+   338→  const { navigate } = useNavigationStore();
+   339→
+   340→  const [examId, setExamId] = useState('');
+   341→  const [difficulty, setDifficulty] = useState('');
+   342→  const [confidence, setConfidence] = useState(50);
+   343→  const [emotionalState, setEmotionalState] = useState('');
+   344→  const [whatWentWell, setWhatWentWell] = useState('');
+   345→  const [whatWentWrong, setWhatWentWrong] = useState('');
+   346→  const [biggestLesson, setBiggestLesson] = useState('');
+   347→  const [actionPlan, setActionPlan] = useState('');
+   348→  const [targetScore, setTargetScore] = useState('');
+   349→  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+   350→
+   351→  const { data: examOptions, isLoading: loadingOptions } = useQuery({
+   352→    queryKey: ['reflection-exam-options'],
+   353→    queryFn: getReflectionExamOptions,
+   354→  });
+   355→
+   356→  const { data: selectedExam, isLoading: loadingExam } = useQuery({
+   357→    queryKey: ['exam-for-dialog', examId],
+   358→    queryFn: () => getExam(examId),
+   359→    enabled: !!examId,
+   360→  });
+   361→
+   362→  const createMutation = useMutation({
+   363→    mutationFn: createReflection,
+   364→    onSuccess: () => {
+   365→      toast.success('Reflection created successfully!');
+   366→      queryClient.invalidateQueries({ queryKey: ['reflections'] });
+   367→      queryClient.invalidateQueries({ queryKey: ['reflection-exam-options'] });
+   368→      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+   369→      queryClient.invalidateQueries({ queryKey: ['weakness'] });
+   370→      onOpenChange(false);
+   371→      resetForm();
+   372→    },
+   373→    onError: (err: Error) => {
+   374→      toast.error(err.message || 'Failed to create reflection');
+   375→    },
+   376→  });
+   377→
+   378→  const resetForm = () => {
+   379→    setExamId('');
+   380→    setDifficulty('');
+   381→    setConfidence(50);
+   382→    setEmotionalState('');
+   383→    setWhatWentWell('');
+   384→    setWhatWentWrong('');
+   385→    setBiggestLesson('');
+   386→    setActionPlan('');
+   387→    setTargetScore('');
+   388→    setFormErrors({});
+   389→  };
+   390→
+   391→  const handleSubmit = () => {
+   392→    const result = reflectionFormSchema.safeParse({
+   393→      examId,
+   394→      difficulty: difficulty || undefined,
+   395→      confidence,
+   396→      emotionalState: emotionalState || undefined,
+   397→      whatWentWell: whatWentWell || '',
+   398→      whatWentWrong: whatWentWrong || '',
+   399→      biggestLesson: biggestLesson || '',
+   400→      actionPlan: actionPlan || undefined,
+   401→      targetScore: targetScore ? Number(targetScore) : undefined,
+   402→    });
+   403→    if (!result.success) {
+   404→      const errors: Record<string, string> = {};
+   405→      const fieldErrors = result.error.flatten().fieldErrors;
+   406→      for (const [key, messages] of Object.entries(fieldErrors)) {
+   407→        if (messages && messages.length > 0) {
+   408→          errors[key] = messages[0];
+   409→        }
+   410→      }
+   411→      setFormErrors(errors);
+   412→      return;
+   413→    }
+   414→    setFormErrors({});
+   415→    createMutation.mutate({
+   416→      examId,
+   417→      examName: selectedExam?.name ?? '',
+   418→      examDate: selectedExam?.examDate ?? null,
+   419→      score: selectedExam?.score ?? null,
+   420→      cutoff: selectedExam?.cutoff ?? null,
+   421→      gap: selectedExam?.cutoffGap ?? null,
+   422→      result: selectedExam?.result ?? null,
+   423→      difficulty: difficulty || null,
+   424→      confidence,
+   425→      emotionalState: emotionalState || null,
+   426→      whatWentWrong: whatWentWrong || null,
+   427→      whatWentWell: whatWentWell || null,
+   428→      biggestLesson: biggestLesson || null,
+   429→      actionPlan: actionPlan || null,
+   430→      targetScore: targetScore ? Number(targetScore) : null,
+   431→    });
+   432→  };
+   433→
+   434→  const ToggleButton = ({
+   435→    label,
+   436→    active,
+   437→    onClick,
+   438→    activeColor,
+   439→  }: {
+   440→    label: string;
+   441→    active: boolean;
+   442→    onClick: () => void;
+   443→    activeColor?: string;
+   444→  }) => (
+   445→    <button
+   446→      type="button"
+   447→      onClick={onClick}
+   448→      className={cn(
+   449→        'rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-200',
+   450→        active
+   451→          ? activeColor
+   452→            ? activeColor
+   453→            : 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+   454→          : 'border-border bg-background text-muted-foreground hover:border-emerald-400 hover:text-emerald-600',
+   455→      )}
+   456→    >
+   457→      {label}
+   458→    </button>
+   459→  );
+   460→
+   461→  return (
+   462→    <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) resetForm(); }}>
+   463→      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+   464→        <DialogHeader>
+   465→          <DialogTitle className="flex items-center gap-2">
+   466→            <PenLine className="h-5 w-5 text-emerald-600" />
+   467→            Create Reflection
+   468→          </DialogTitle>
+   469→          <DialogDescription>
+   470→            Write a detailed reflection for your exam to track progress
+   471→          </DialogDescription>
+   472→        </DialogHeader>
+   473→
+   474→        <div className="space-y-5 mt-2">
+   475→          {/* Exam Selection */}
+   476→          <div className="space-y-2">
+   477→            <Label className="text-sm font-medium">
+   478→              Select Exam <span className="text-red-500">*</span>
+   479→            </Label>
+   480→            <Select value={examId} onValueChange={(v) => { setExamId(v); if (formErrors.examId) setFormErrors(prev => { const { examId, ...rest } = prev; return rest; }); }}>
+   481→              <SelectTrigger>
+   482→                <SelectValue placeholder="Choose an exam..." />
+   483→              </SelectTrigger>
+   484→              <SelectContent>
+   485→                {examOptions?.map((e) => (
+   486→                  <SelectItem key={e.id} value={e.id}>
+   487→                    {e.name} — {e.examDate}
+   488→                  </SelectItem>
+   489→                ))}
+   490→                {(!examOptions || examOptions.length === 0) && !loadingOptions && (
+   491→                  <SelectItem value="__none" disabled>
+   492→                    No exams available
+   493→                  </SelectItem>
+   494→                )}
+   495→              </SelectContent>
+   496→            </Select>
+   497→            {formErrors.examId && <p className="text-xs text-red-500 mt-1">{formErrors.examId}</p>}
+   498→          </div>
+   499→          {loadingExam && examId && (
+   500→            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+   501→              <Skeleton className="h-4 w-40" />
+   502→              <Skeleton className="mt-2 h-3 w-24" />
+   503→            </div>
+   504→          )}
+   505→          {selectedExam && (
+   506→            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/20">
+   507→              <p className="text-sm font-semibold text-foreground">{selectedExam.name}</p>
+   508→              <p className="text-xs text-muted-foreground">
+   509→                {selectedExam.examDate} · {selectedExam.category} · Score: {selectedExam.score}/{selectedExam.maxScore}
+   510→                {selectedExam.result && (
+   511→                  <span className={cn(
+   512→                    'ml-1 font-medium',
+   513→                    selectedExam.result.toLowerCase().includes('qualified')
+   514→                      ? 'text-emerald-600 dark:text-emerald-400'
+   515→                      : 'text-red-600 dark:text-red-400',
+   516→                  )}>
+   517→                    · {selectedExam.result}
+   518→                  </span>
+   519→                )}
+   520→              </p>
+   521→            </div>
+   522→          )}
+   523→
+   524→          <Separator />
+   525→
+   526→          {/* Difficulty */}
+   527→          <div className="space-y-2">
+   528→            <Label className="text-sm font-medium">Difficulty Level</Label>
+   529→            <div className="flex flex-wrap gap-2">
+   530→              {DIFFICULTY_OPTIONS.map((d) => (
+   531→                <ToggleButton
+   532→                  key={d}
+   533→                  label={d}
+   534→                  active={difficulty === d}
+   535→                  onClick={() => { setDifficulty(difficulty === d ? '' : d); if (formErrors.difficulty) setFormErrors(prev => { const { difficulty, ...rest } = prev; return rest; }); }}
+   536→                  activeColor={
+   537→                    d === 'Easy' ? 'border-emerald-500 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+   538→                    : d === 'Moderate' ? 'border-amber-500 bg-amber-500/15 text-amber-700 dark:text-amber-400'
+   539→                    : d === 'Hard' ? 'border-orange-500 bg-orange-500/15 text-orange-700 dark:text-orange-400'
+   540→                    : 'border-red-500 bg-red-500/15 text-red-700 dark:text-red-400'
+   541→                  }
+   542→                />
+   543→              ))}
+   544→            </div>
+   545→            {formErrors.difficulty && <p className="text-xs text-red-500 mt-1">{formErrors.difficulty}</p>}
+   546→          </div>
+   547→
+   548→          {/* Confidence Slider */}
+   549→          <div className="space-y-3">
+   550→            <div className="flex items-center justify-between">
+   551→              <Label className="text-sm font-medium">Confidence Level</Label>
+   552→              <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{confidence}%</span>
+   553→            </div>
+   554→            <Slider
+   555→              value={[confidence]}
+   556→              onValueChange={(v) => setConfidence(v[0])}
+   557→              min={0}
+   558→              max={100}
+   559→              step={5}
+   560→              className="[&_[data-slot=slider-range]]:bg-emerald-500 [&_[data-slot=slider-thumb]]:border-emerald-500"
+   561→            />
+   562→            <div className="flex justify-between text-[10px] text-muted-foreground">
+   563→              <span>Not Confident</span>
+   564→              <span>Very Confident</span>
+   565→            </div>
+   566→          </div>
+   567→
+   568→          {/* Emotional State */}
+   569→          <div className="space-y-2">
+   570→            <Label className="text-sm font-medium">Emotional State</Label>
+   571→            <div className="flex flex-wrap gap-2">
+   572→              {EMOTIONAL_OPTIONS.map((e) => {
+   573→                const cfg = EMOTIONAL_CONFIG[e];
+   574→                return (
+   575→                  <ToggleButton
+   576→                    key={e}
+   577→                    label={e}
+   578→                    active={emotionalState === e}
+   579→                    onClick={() => { setEmotionalState(emotionalState === e ? '' : e); if (formErrors.emotionalState) setFormErrors(prev => { const { emotionalState, ...rest } = prev; return rest; }); }}
+   580→                    activeColor={cn('border', cfg.cls, cfg.bg.replace('dark:', 'dark:').replace('100', '500/15').replace('50', '500/15'))}
+   581→                  />
+   582→                );
+   583→              })}
+   584→            </div>
+   585→            {formErrors.emotionalState && <p className="text-xs text-red-500 mt-1">{formErrors.emotionalState}</p>}
+   586→          </div>
+   587→
+   588→          <Separator />
+   589→
+   590→          {/* What Went Well */}
+   591→          <div className="space-y-2">
+   592→            <Label className="text-sm font-medium flex items-center gap-1.5">
+   593→              <Smile className="h-3.5 w-3.5 text-emerald-500" /> What Went Well
+   594→            </Label>
+   595→            <Textarea
+   596→              placeholder="Describe what went well in the exam..."
+   597→              value={whatWentWell}
+   598→              onChange={(e) => { setWhatWentWell(e.target.value); if (formErrors.whatWentWell) setFormErrors(prev => { const { whatWentWell, ...rest } = prev; return rest; }); }}
+   599→              rows={3}
+   600→              className="resize-none"
+   601→            />
+   602→            {formErrors.whatWentWell && <p className="text-xs text-red-500 mt-1">{formErrors.whatWentWell}</p>}
+   603→          </div>
+   604→
+   605→          {/* What Went Wrong */}
+   606→          <div className="space-y-2">
+   607→            <Label className="text-sm font-medium flex items-center gap-1.5">
+   608→              <Frown className="h-3.5 w-3.5 text-rose-500" /> What Went Wrong
+   609→            </Label>
+   610→            <Textarea
+   611→              placeholder="Describe what didn't go as planned..."
+   612→              value={whatWentWrong}
+   613→              onChange={(e) => { setWhatWentWrong(e.target.value); if (formErrors.whatWentWrong) setFormErrors(prev => { const { whatWentWrong, ...rest } = prev; return rest; }); }}
+   614→              rows={3}
+   615→              className="resize-none"
+   616→            />
+   617→            {formErrors.whatWentWrong && <p className="text-xs text-red-500 mt-1">{formErrors.whatWentWrong}</p>}
+   618→          </div>
+   619→
+   620→          {/* Biggest Lesson */}
+   621→          <div className="space-y-2">
+   622→            <Label className="text-sm font-medium flex items-center gap-1.5">
+   623→              <Sparkles className="h-3.5 w-3.5 text-amber-500" /> Biggest Lesson
+   624→            </Label>
+   625→            <Textarea
+   626→              placeholder="What's the most important thing you learned?"
+   627→              value={biggestLesson}
+   628→              onChange={(e) => { setBiggestLesson(e.target.value); if (formErrors.biggestLesson) setFormErrors(prev => { const { biggestLesson, ...rest } = prev; return rest; }); }}
+   629→              rows={2}
+   630→              className="resize-none"
+   631→            />
+   632→            {formErrors.biggestLesson && <p className="text-xs text-red-500 mt-1">{formErrors.biggestLesson}</p>}
+   633→          </div>
+   634→
+   635→          {/* Action Plan */}
+   636→          <div className="space-y-2">
+   637→            <Label className="text-sm font-medium flex items-center gap-1.5">
+   638→              <Target className="h-3.5 w-3.5 text-teal-500" /> Action Plan
+   639→            </Label>
+   640→            <Textarea
+   641→              placeholder="What specific actions will you take before the next attempt?"
+   642→              value={actionPlan}
+   643→              onChange={(e) => setActionPlan(e.target.value)}
+   644→              rows={3}
+   645→              className="resize-none"
+   646→            />
+   647→          </div>
+   648→
+   649→          {/* Target Score */}
+   650→          <div className="space-y-2">
+   651→            <Label className="text-sm font-medium">Target Score for Next Attempt</Label>
+   652→            <Input
+   653→              type="number"
+   654→              placeholder="e.g. 85"
+   655→              value={targetScore}
+   656→              onChange={(e) => { setTargetScore(e.target.value); if (formErrors.targetScore) setFormErrors(prev => { const { targetScore, ...rest } = prev; return rest; }); }}
+   657→              className="max-w-[200px]"
+   658→            />
+   659→            {formErrors.targetScore && <p className="text-xs text-red-500 mt-1">{formErrors.targetScore}</p>}
+   660→          </div>
+   661→        </div>
+   662→
+   663→        <DialogFooter className="mt-4">
+   664→          <Button variant="outline" onClick={() => onOpenChange(false)}>
+   665→            Cancel
+   666→          </Button>
+   667→          <Button
+   668→            onClick={handleSubmit}
+   669→            disabled={createMutation.isPending || !examId}
+   670→            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+   671→          >
+   672→            {createMutation.isPending ? 'Saving...' : 'Save Reflection'}
+   673→          </Button>
+   674→        </DialogFooter>
+   675→      </DialogContent>
+   676→    </Dialog>
+   677→  );
+   678→}
+   679→
+   680→// ── Main Component ───────────────────────────────────────────
+   681→export default function ReflectionsPage() {
+   682→  const navigate = useNavigationStore();
+   683→  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+   684→
+   685→  const { data: reflections, isLoading } = useQuery({
+   686→    queryKey: ['reflections-list'],
+   687→    queryFn: () => getReflections(),
+   688→  });
+   689→
+   690→  const existingReflections = reflections ?? [];
+   691→
+   692→  if (isLoading) {
+   693→    return (
+   694→      <div className="space-y-6">
+   695→        <Skeleton className="h-8 w-48" />
+   696→        <Skeleton className="h-8 w-40" />
+   697→        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+   698→          {Array.from({ length: 3 }).map((_, i) => (
+   699→            <Skeleton key={i} className="h-64 rounded-xl" />
+   700→          ))}
+   701→        </div>
+   702→      </div>
+   703→    );
+   704→  }
+   705→
+   706→  return (
+   707→    <div className="space-y-6">
+   708→      {/* ── Header ──────────────────────────────────────── */}
+   709→      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   710→        <div>
+   711→          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+   712→            Reflections
+   713→          </h1>
+   714→          <p className="mt-1 text-sm text-muted-foreground">
+   715→            Review and learn from your exam experiences
+   716→          </p>
+   717→        </div>
+   718→        <Button
+   719→          className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-700 dark:hover:bg-emerald-800"
+   720→          onClick={() => setCreateDialogOpen(true)}
+   721→        >
+   722→          <Plus className="mr-2 h-4 w-4" />
+   723→          Create Reflection
+   724→        </Button>
+   725→      </div>
+   726→
+   727→      {/* ── Stats Summary ── */}
+   728→      {existingReflections.length > 0 && (
+   729→        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+   730→          {[
+   731→            {
+   732→              icon: BookOpen,
+   733→              label: 'Total Reflections',
+   734→              value: existingReflections.length,
+   735→              bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+   736→              iconCls: 'text-emerald-600 dark:text-emerald-400',
+   737→            },
+   738→            {
+   739→              icon: Smile,
+   740→              label: 'Confident Entries',
+   741→              value: existingReflections.filter((r) => r.emotionalState === 'Confident').length,
+   742→              bg: 'bg-emerald-100 dark:bg-emerald-900/50',
+   743→              iconCls: 'text-emerald-600 dark:text-emerald-400',
+   744→            },
+   745→            {
+   746→              icon: BrainCircuit,
+   747→              label: 'Avg Confidence',
+   748→              value: `${Math.round(
+   749→                existingReflections.reduce((a, r) => a + (r.confidence ?? 50), 0) / existingReflections.length,
+   750→              )}%`,
+   751→              bg: 'bg-teal-100 dark:bg-teal-900/50',
+   752→              iconCls: 'text-teal-600 dark:text-teal-400',
+   753→            },
+   754→            {
+   755→              icon: Heart,
+   756→              label: 'With Action Plan',
+   757→              value: existingReflections.filter((r) => r.actionPlan).length,
+   758→              bg: 'bg-amber-100 dark:bg-amber-900/50',
+   759→              iconCls: 'text-amber-600 dark:text-amber-400',
+   760→            },
+   761→          ].map((stat) => {
+   762→            const Icon = stat.icon;
+   763→            return (
+   764→              <Card key={stat.label} className="transition-shadow duration-200 hover:shadow-md">
+   765→                <CardContent className="flex items-center gap-3 p-4">
+   766→                  <div className={cn('flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg', stat.bg)}>
+   767→                    <Icon className={cn('h-5 w-5', stat.iconCls)} />
+   768→                  </div>
+   769→                  <div>
+   770→                    <p className="text-lg font-bold text-foreground">{stat.value}</p>
+   771→                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+   772→                  </div>
+   773→                </CardContent>
+   774→              </Card>
+   775→            );
+   776→          })}
+   777→        </div>
+   778→      )}
+   779→
+   780→      {/* ── Reflections List ── */}
+   781→      {existingReflections.length === 0 ? (
+   782→        <EmptyReflectionState onCreateClick={() => setCreateDialogOpen(true)} />
+   783→      ) : (
+   784→        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+   785→          {existingReflections.map((r) => (
+   786→            <ReflectionCard key={r.id} reflection={r} />
+   787→          ))}
+   788→        </div>
+   789→      )}
+   790→
+   791→      {/* ── Create Dialog ── */}
+   792→      <CreateReflectionDialog
+   793→        open={createDialogOpen}
+   794→        onOpenChange={setCreateDialogOpen}
+   795→      />
+   796→    </div>
+   797→  );
+   798→}

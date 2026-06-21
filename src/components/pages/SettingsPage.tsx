@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   Settings, Bell, Globe, Shield, Palette, Info, Save, Mail,
   Lock, Trash2, HardDrive, Download, Moon, Sun, Monitor, BarChart3,
-  ShieldCheck, Eye, EyeOff, Zap, Check,
+  ShieldCheck, Eye, EyeOff, Zap, Check, User, SlidersHorizontal,
 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -121,33 +121,41 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-sm">
-            <Settings className="size-5 text-white drop-shadow-sm" />
+      {/* Header with Gradient */}
+      <Card className="rounded-2xl overflow-hidden border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30">
+        <div className="relative px-6 py-6 sm:px-8">
+          <div className="absolute inset-0 opacity-20 overflow-hidden">
+            <div className="absolute -top-8 -right-8 size-40 rounded-full bg-emerald-300/30 blur-2xl" />
+            <div className="absolute -bottom-8 -left-8 size-48 rounded-full bg-teal-300/30 blur-2xl" />
           </div>
-          <div>
-            <h2 className="text-xl font-bold">Settings</h2>
-            <p className="text-xs text-muted-foreground">Manage your app preferences and account</p>
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-md">
+                <Settings className="size-6 text-white drop-shadow-sm" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Settings</h2>
+                <p className="text-xs text-muted-foreground">Manage your app preferences and account</p>
+              </div>
+            </div>
+            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 transition-all duration-200" onClick={handleSave} disabled={saveMutation.isPending}>
+              <Save className="size-4" /> {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
+            </Button>
           </div>
         </div>
-        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" onClick={handleSave} disabled={saveMutation.isPending}>
-          <Save className="size-4" /> {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </div>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Account Settings */}
-          <Card className="rounded-2xl">
+          {/* Account Settings - with glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  <Settings className="size-4" />
+                  <User className="size-4" />
                 </div>
-                Account Settings
-              </CardTitle>
+                <CardTitle className="text-sm font-semibold">Account Settings</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -195,60 +203,82 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Notification Settings */}
-          <Card className="rounded-2xl">
+          {/* Section Divider - Notifications */}
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+              <Bell className="size-3" /> Notifications & Alerts
+            </span>
+            <div className="flex-1 h-px bg-gradient-to-r from-amber-500/20 via-border to-transparent" />
+          </div>
+
+          {/* Notification Settings - with preference cards and glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div className="flex size-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                   <Bell className="size-4" />
                 </div>
-                Notification Settings
+                <CardTitle className="text-sm font-semibold">Notification Preferences</CardTitle>
                 <Badge variant="secondary" className="text-[10px] ml-auto font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                   {enabledCount}/{notificationToggles.length} Active
                 </Badge>
-              </CardTitle>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-1">
-              {notificationToggles.map((toggle, i) => {
+            <CardContent className="space-y-2">
+              {notificationToggles.map((toggle) => {
                 const Icon = toggle.icon;
                 const isOn = !!s?.[toggle.key];
                 return (
-                  <div key={toggle.key}>
-                    <div className="flex items-center justify-between py-3 px-1 rounded-lg hover:bg-muted/50 transition-colors">
-                      <div className="flex items-start gap-3">
-                        <div className={cn(
-                          'flex size-8 items-center justify-center rounded-lg shrink-0 mt-0.5 transition-colors duration-200',
-                          isOn ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-muted text-muted-foreground',
-                        )}>
-                          <Icon className="size-4" />
-                        </div>
-                        <div>
-                          <p className={cn('text-sm font-medium transition-colors', isOn ? 'text-foreground' : 'text-muted-foreground')}>{toggle.label}</p>
-                          <p className="text-xs text-muted-foreground">{toggle.description}</p>
-                        </div>
+                  <div
+                    key={toggle.key}
+                    className={cn(
+                      'flex items-center justify-between p-3 rounded-xl transition-all duration-200 border',
+                      isOn
+                        ? 'bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200/50 dark:border-emerald-800/30'
+                        : 'bg-muted/30 border-transparent hover:bg-muted/50',
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn(
+                        'flex size-9 items-center justify-center rounded-xl shrink-0 mt-0.5 transition-all duration-200 shadow-sm',
+                        isOn ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-muted text-muted-foreground',
+                      )}>
+                        <Icon className="size-4" />
                       </div>
-                      <Switch
-                        checked={isOn}
-                        onCheckedChange={() => handleToggle(toggle.key)}
-                        className="data-[state=checked]:bg-emerald-600"
-                      />
+                      <div>
+                        <p className={cn('text-sm font-medium transition-colors', isOn ? 'text-foreground' : 'text-muted-foreground')}>{toggle.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{toggle.description}</p>
+                        <span className="text-[9px] uppercase tracking-wider font-semibold text-muted-foreground/60 mt-0.5 block">{toggle.category}</span>
+                      </div>
                     </div>
-                    {i < notificationToggles.length - 1 && <Separator />}
+                    <Switch
+                      checked={isOn}
+                      onCheckedChange={() => handleToggle(toggle.key)}
+                      className="data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-muted-foreground/20"
+                    />
                   </div>
                 );
               })}
             </CardContent>
           </Card>
 
-          {/* App Preferences */}
-          <Card className="rounded-2xl">
+          {/* Section Divider - Preferences */}
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+              <SlidersHorizontal className="size-3" /> Preferences
+            </span>
+            <div className="flex-1 h-px bg-gradient-to-r from-teal-500/20 via-border to-transparent" />
+          </div>
+
+          {/* App Preferences - with glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div className="flex size-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
                   <Globe className="size-4" />
                 </div>
-                App Preferences
-              </CardTitle>
+                <CardTitle className="text-sm font-semibold">App Preferences</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -274,21 +304,33 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          {/* Privacy & Data */}
-          <Card className="rounded-2xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                  <Shield className="size-4" />
+          {/* Section Divider - Privacy & Appearance */}
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-md flex items-center gap-1.5">
+              <Shield className="size-3" /> Privacy & Appearance
+            </span>
+            <div className="flex-1 h-px bg-gradient-to-r from-violet-500/20 via-border to-transparent" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Privacy & Data - with glassmorphism */}
+            <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
+                    <Shield className="size-4" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold">Privacy &amp; Data</CardTitle>
                 </div>
-                Privacy &amp; Data
-              </CardTitle>
-            </CardHeader>
+              </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
+              <div className={cn(
+                'flex items-center justify-between p-3.5 rounded-xl transition-all duration-200 border',
+                s?.privacyMode ? 'bg-emerald-50/50 dark:bg-emerald-950/10 border-emerald-200/50 dark:border-emerald-800/30' : 'bg-muted/50 border-transparent',
+              )}>
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    'flex size-8 items-center justify-center rounded-lg transition-colors',
+                    'flex size-9 items-center justify-center rounded-xl transition-all duration-200 shadow-sm',
                     s?.privacyMode ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-muted text-muted-foreground',
                   )}>
                     {s?.privacyMode ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -298,7 +340,7 @@ export default function SettingsPage() {
                     <p className="text-xs text-muted-foreground">Hide sensitive data from dashboard</p>
                   </div>
                 </div>
-                <Switch checked={s?.privacyMode || false} onCheckedChange={() => handleToggle('privacyMode')} className="data-[state=checked]:bg-emerald-600" />
+                <Switch checked={s?.privacyMode || false} onCheckedChange={() => handleToggle('privacyMode')} className="data-[state=checked]:bg-emerald-600 data-[state=unchecked]:bg-muted-foreground/20" />
               </div>
               <Separator />
               <div className="flex flex-wrap gap-3">
@@ -316,26 +358,26 @@ export default function SettingsPage() {
                 })}
               </div>
             </CardContent>
-          </Card>
+            </Card>
 
-          {/* Appearance */}
-          <Card className="rounded-2xl">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
-                  <Palette className="size-4" />
+            {/* Appearance - with theme preview swatches and glassmorphism */}
+            <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+                    <Palette className="size-4" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold">Appearance</CardTitle>
                 </div>
-                Appearance
-              </CardTitle>
-            </CardHeader>
+              </CardHeader>
             <CardContent className="space-y-5">
               <div>
                 <Label className="text-xs text-muted-foreground mb-3 block font-medium">Theme</Label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: 'light', icon: Sun, label: 'Light', desc: 'Clean & bright' },
-                    { value: 'dark', icon: Moon, label: 'Dark', desc: 'Easy on eyes' },
-                    { value: 'system', icon: Monitor, label: 'System', desc: 'Auto detect' },
+                    { value: 'light', icon: Sun, label: 'Light', desc: 'Clean & bright', preview: 'bg-white border' },
+                    { value: 'dark', icon: Moon, label: 'Dark', desc: 'Easy on eyes', preview: 'bg-gray-900 border-gray-700' },
+                    { value: 'system', icon: Monitor, label: 'System', desc: 'Auto detect', preview: 'bg-gradient-to-br from-white to-gray-900 border' },
                   ].map((t) => {
                     const Icon = t.icon;
                     const isActive = theme === t.value;
@@ -344,25 +386,33 @@ export default function SettingsPage() {
                         key={t.value}
                         onClick={() => setTheme(t.value)}
                         className={cn(
-                          'relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
+                          'relative flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5',
                           isActive
-                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 shadow-md'
+                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 shadow-lg shadow-emerald-500/15'
                             : 'border-transparent bg-muted/50 hover:border-border',
                         )}
                       >
                         <div className={cn(
-                          'flex size-10 items-center justify-center rounded-xl transition-colors',
-                          isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-muted text-muted-foreground',
+                          'size-12 rounded-xl transition-all duration-200 shadow-inner overflow-hidden',
+                          t.preview,
+                          isActive ? 'ring-2 ring-emerald-500/30' : '',
                         )}>
-                          <Icon className="size-5" />
+                          <div className="flex items-center justify-center h-full">
+                            <div className="w-6 h-3 rounded-sm bg-gradient-to-r from-emerald-400 to-teal-400" />
+                          </div>
+                        </div>
+                        <div className={cn('flex size-8 items-center justify-center rounded-lg transition-all duration-200',
+                          isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-muted text-muted-foreground'
+                        )}>
+                          <Icon className="size-4" />
                         </div>
                         <div className="text-center">
                           <p className={cn('text-sm font-semibold', isActive ? 'text-foreground' : 'text-muted-foreground')}>{t.label}</p>
                           <p className="text-[10px] text-muted-foreground">{t.desc}</p>
                         </div>
                         {isActive && (
-                          <div className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-emerald-600">
-                            <Check className="size-3 text-white" />
+                          <div className="absolute top-2 right-2 flex size-5 items-center justify-center rounded-full bg-emerald-600 shadow-sm">
+                            <Check className="size-3 text-white" strokeWidth={3} />
                           </div>
                         )}
                       </button>
@@ -373,7 +423,7 @@ export default function SettingsPage() {
               <Separator />
               <div>
                 <Label className="text-xs text-muted-foreground mb-3 block font-medium">Accent Color</Label>
-                <div className="flex gap-4">
+                <div className="flex gap-3">
                   {accentColors.map((c) => {
                     const isActive = selectedAccent === c.name;
                     return (
@@ -389,7 +439,13 @@ export default function SettingsPage() {
                           'size-10 rounded-full transition-all shadow-sm',
                           c.class,
                           isActive ? `ring-2 ring-offset-2 ring-offset-background ${c.ring} shadow-md` : '',
-                        )} />
+                        )}>
+                          {isActive && (
+                            <div className="flex items-center justify-center h-full">
+                              <Check className="size-3 text-white" strokeWidth={3} />
+                            </div>
+                          )}
+                        </div>
                         <span className={cn('text-[11px] font-medium transition-colors', isActive ? 'text-foreground' : 'text-muted-foreground')}>
                           {c.label}
                         </span>
@@ -399,17 +455,18 @@ export default function SettingsPage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
 
-          {/* About */}
-          <Card className="rounded-2xl">
+          {/* About & Support - with glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+              <div className="flex items-center gap-3">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
                   <Info className="size-4" />
                 </div>
-                About &amp; Support
-              </CardTitle>
+                <CardTitle className="text-sm font-semibold">About &amp; Support</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
@@ -430,7 +487,7 @@ export default function SettingsPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <Card className="border-emerald-500/50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl overflow-hidden">
+          <Card className="border-emerald-500/50 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 rounded-2xl overflow-hidden backdrop-blur-sm">
             <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
             <CardContent className="p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -453,11 +510,12 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl">
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <BarChart3 className="size-4 text-emerald-600" /> Quick Stats
-              </CardTitle>
+              <div className="flex items-center gap-3">
+                <BarChart3 className="size-4 text-emerald-600" />
+                <CardTitle className="text-sm font-semibold">Quick Stats</CardTitle>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {[

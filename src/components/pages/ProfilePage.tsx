@@ -246,7 +246,7 @@ export default function ProfilePage() {
                 {examFocusConfig.map((item) => {
                   const Icon = item.icon;
                   const valueKey = item.label.toLowerCase().replace(/ /g, '') as keyof UserProfile;
-                  const value = (user as Record<string, string | undefined>)?.[
+                  const value = (user as unknown as Record<string, string | undefined>)?.[
                     item.label === 'Primary Exam' ? 'primaryExam' :
                     item.label === 'Secondary Exam' ? 'secondaryExam' :
                     item.label === 'Target Year' ? 'targetYear' :

@@ -136,7 +136,6 @@ export function StatCard({
                       'flex items-center justify-center rounded-md px-1.5 py-0.5 text-[11px] font-bold',
                       trend === 'up' && 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
                       trend === 'down' && 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
-                      trend === 'neutral' && 'bg-muted text-muted-foreground',
                     )}
                   >
                     <TrendIcon className={cn('size-3', trend === 'up' ? '-rotate-0' : trend === 'down' ? 'rotate-0' : '')} />

@@ -193,17 +193,18 @@ function ExamFormFields({
   setForm: React.Dispatch<React.SetStateAction<ExamFormState>>;
 }) {
   const addSection = () =>
-    setForm((f) => [...f.sections, { section: '', score: '', max: '' }]);
+    setForm((f) => ({ ...f, sections: [...f.sections, { section: '', score: '', max: '' }] }));
   const removeSection = (idx: number) =>
-    setForm((f) => f.sections.filter((_, i) => i !== idx));
+    setForm((f) => ({ ...f, sections: f.sections.filter((_, i) => i !== idx) }));
   const updateSection = (
     idx: number,
     field: 'section' | 'score' | 'max',
     value: string,
   ) =>
-    setForm((f) =>
-      f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
-    );
+    setForm((f) => ({
+      ...f,
+      sections: f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+    }));
 
   return (
     <div className="grid gap-4 py-2">
@@ -387,7 +388,7 @@ function AddExamDialog({
             section: s.section,
             score: Number(s.score),
             max: Number(s.max),
-          })),
+          })) as any,
       }),
     onSuccess: () => {
       toast.success('Exam added successfully!');
@@ -459,7 +460,7 @@ function EditExamDialog({
             section: s.section,
             score: Number(s.score),
             max: Number(s.max),
-          })),
+          })) as any,
       });
     },
     onSuccess: () => {

@@ -230,14 +230,17 @@ function AddExamDialog({
   });
 
   const addSection = () => {
-    setForm((f) => [
-      ...f.sections,
-      { section: '', score: '', max: '' },
-    ]);
+    setForm((f) => ({
+      ...f,
+      sections: [...f.sections, { section: '', score: '', max: '' }],
+    }));
   };
 
   const removeSection = (idx: number) => {
-    setForm((f) => f.sections.filter((_, i) => i !== idx));
+    setForm((f) => ({
+      ...f,
+      sections: f.sections.filter((_, i) => i !== idx),
+    }));
   };
 
   const updateSection = (
@@ -245,9 +248,10 @@ function AddExamDialog({
     field: 'section' | 'score' | 'max',
     value: string,
   ) => {
-    setForm((f) =>
-      f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
-    );
+    setForm((f) => ({
+      ...f,
+      sections: f.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)),
+    }));
   };
 
   return (
@@ -827,7 +831,7 @@ export default function DashboardPage() {
               variant="ghost"
               size="sm"
               className="text-emerald-600 dark:text-emerald-400"
-              onClick={() => navigate('weakness')}
+              onClick={() => navigate('weakness-heatmap')}
             >
               Heatmap
               <ArrowRight className="ml-1 size-4" />

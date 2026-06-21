@@ -4,7 +4,7 @@ import { useState } from 'react';
 import {
   LogOut, Monitor, Smartphone, Tablet, Laptop, ShieldCheck, CircleCheck,
   HelpCircle, ExternalLink, ChevronRight, LogIn, MapPin, Clock,
-  CheckCircle, Lock, Zap, Eye,
+  CheckCircle, Lock, Zap, Eye, AlertTriangle, Timer,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -62,6 +62,7 @@ export default function SignOutPage() {
   const { navigate } = useNavigationStore();
   const [confirmAllOpen, setConfirmAllOpen] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<number>>(new Set());
+  const [signOutCountdown, setSignOutCountdown] = useState<number | null>(null);
   const profile = useUserStore((s) => s.profile);
   const { data: devices, isLoading } = useQuery({ queryKey: ['devices'], queryFn: getDevices });
   const initials = profile?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'U';
@@ -77,6 +78,20 @@ export default function SignOutPage() {
   const handleSignOutAll = () => {
     toast.success('Signed out from all devices');
     setConfirmAllOpen(false);
+    setSignOutCountdown(null);
+  };
+
+  const handleSignOutAllTrigger = () => {
+    setSignOutCountdown(3);
+    const timer = setInterval(() => {
+      setSignOutCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   const toggleCheck = (i: number) => {
@@ -114,29 +129,46 @@ export default function SignOutPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-sm">
-          <LogOut className="size-5 text-white drop-shadow-sm" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold">Sign Out</h2>
-          <p className="text-xs text-muted-foreground">Manage your active sessions and security</p>
-        </div>
-      </div>
-
-      {/* Current User Card with Status */}
+      {/* Header with Gradient */}
       <Card className="rounded-2xl overflow-hidden border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30">
+        <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
+        <div className="relative px-6 py-6 sm:px-8">
+          <div className="absolute inset-0 opacity-20 overflow-hidden">
+            <div className="absolute -top-8 -right-8 size-40 rounded-full bg-emerald-300/30 blur-2xl" />
+            <div className="absolute -bottom-8 -left-8 size-48 rounded-full bg-teal-300/30 blur-2xl" />
+          </div>
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-md">
+                <LogOut className="size-6 text-white drop-shadow-sm" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Sign Out</h2>
+                <p className="text-xs text-muted-foreground">Manage your active sessions and security</p>
+              </div>
+            </div>
+            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-xs font-semibold gap-1.5 self-start">
+              <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+              {allDevices.length} Active Sessions
+            </Badge>
+          </div>
+        </div>
+      </Card>
+
+      {/* Current User Card with Status - glassmorphism */}
+      <Card className="rounded-2xl overflow-hidden border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30 backdrop-blur-sm">
         <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
             <div className="relative">
-              <Avatar className="size-16 ring-4 ring-white dark:ring-card shadow-lg">
-                <AvatarFallback className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 text-lg font-bold">
+              <Avatar className="size-16 ring-4 ring-white dark:ring-card shadow-xl">
+                <AvatarFallback className="bg-gradient-to-br from-emerald-400 to-emerald-600 text-white text-lg font-bold">
                   {initials}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-card" />
+              <div className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-card">
+                <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-40" />
+              </div>
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
@@ -145,9 +177,13 @@ export default function SignOutPage() {
                   <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" /> Online
                 </Badge>
               </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <MapPin className="size-3 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">{profile?.email || 'user@example.com'}</p>
+              <div className="flex items-center gap-4 mt-1.5">
+                <span className="text-sm text-muted-foreground flex items-center gap-1">
+                  <MapPin className="size-3" /> {profile?.email || 'user@example.com'}
+                </span>
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="size-3" /> Session active now
+                </span>
               </div>
             </div>
             <Button variant="outline" className="gap-2 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" onClick={() => {
@@ -164,35 +200,42 @@ export default function SignOutPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Signed In Devices */}
+          {/* Signed In Devices - with gradient section header */}
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Monitor className="size-3.5" /> Signed In Devices
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5 px-3 py-1.5">
+                <Monitor className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Signed In Devices</h3>
+              </div>
               <Badge variant="secondary" className="text-[10px] font-semibold">{allDevices.length} devices</Badge>
-            </h3>
+              <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/20 to-transparent" />
+            </div>
             <div className="space-y-3">
               {allDevices.map((device) => {
                 const Icon = deviceIcons[device.device] || Monitor;
                 const colorClass = deviceColors[device.device] || 'bg-muted text-muted-foreground';
                 return (
                   <Card key={device.id} className={cn(
-                    'rounded-xl transition-all duration-200',
-                    device.isCurrent ? 'border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/10' : 'hover:shadow-md hover:-translate-y-0.5',
+                    'rounded-xl transition-all duration-300',
+                    'bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm',
+                    device.isCurrent ? 'border-emerald-500/30 bg-emerald-50/50 dark:bg-emerald-950/10' : 'hover:shadow-lg hover:-translate-y-1',
                   )}>
                     <CardContent className="p-4 flex items-center gap-4">
-                      <div className={cn('flex size-12 items-center justify-center rounded-xl shrink-0 shadow-sm', colorClass)}>
+                      <div className={cn('flex size-12 items-center justify-center rounded-xl shrink-0 shadow-sm transition-transform duration-200', colorClass, !device.isCurrent && 'group-hover:scale-105')}>
                         <Icon className="size-6" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-sm">{device.device}</p>
                           {device.isCurrent ? (
-                            <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-700 gap-1 font-semibold">
+                            <Badge className="text-[10px] bg-emerald-600 hover:bg-emerald-700 gap-1 font-semibold shadow-sm">
                               <div className="size-1.5 rounded-full bg-white animate-pulse" /> Current Device
                             </Badge>
                           ) : (
                             <div className="flex items-center gap-1">
-                              <div className="size-2 rounded-full bg-emerald-500" />
+                              <div className="relative size-2.5 rounded-full bg-emerald-500">
+                                <div className="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-30" />
+                              </div>
                               <span className="text-[10px] text-muted-foreground">Active</span>
                             </div>
                           )}
@@ -207,7 +250,7 @@ export default function SignOutPage() {
                         </div>
                       </div>
                       {!device.isCurrent && (
-                        <Button variant="outline" size="sm" className="text-xs h-8 gap-1.5 hover:shadow-sm hover:-translate-y-0.5 transition-all duration-200" onClick={() => handleSignOutDevice(device)}>
+                        <Button variant="outline" size="sm" className="text-xs h-8 gap-1.5 hover:shadow-md hover:-translate-y-0.5 hover:border-red-300 hover:text-red-600 dark:hover:border-red-700 dark:hover:text-red-400 transition-all duration-200" onClick={() => handleSignOutDevice(device)}>
                           <LogOut className="size-3" /> Sign Out
                         </Button>
                       )}
@@ -218,36 +261,64 @@ export default function SignOutPage() {
             </div>
           </div>
 
-          {/* Sign Out All */}
-          <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="outline" className="gap-2 w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 py-5">
-                <LogOut className="size-4" /> Sign Out from All Devices
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="rounded-2xl">
-              <AlertDialogHeader>
-                <AlertDialogTitle className="flex items-center gap-2">
-                  <div className="flex size-8 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+          {/* Danger Zone - Animated */}
+          <Card className="rounded-2xl overflow-hidden border-red-500/30 bg-gradient-to-r from-red-50 via-rose-50 to-red-50 dark:from-red-950/20 dark:via-rose-950/20 dark:to-red-950/20">
+            <div className="h-1 bg-gradient-to-r from-red-400 via-rose-400 to-red-500" />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 animate-pulse">
+                  <AlertTriangle className="size-4" />
+                </div>
+                <span className="text-red-700 dark:text-red-400">Danger Zone</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mb-4 leading-relaxed">This will sign you out from all devices including the one you&apos;re currently using. You&apos;ll need to sign in again.</p>
+              <AlertDialog open={confirmAllOpen} onOpenChange={setConfirmAllOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'gap-2 w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-red-200 dark:border-red-800',
+                      'hover:shadow-lg hover:shadow-red-500/20 hover:-translate-y-0.5 transition-all duration-300 py-5',
+                    )}
+                    onClick={handleSignOutAllTrigger}
+                  >
                     <LogOut className="size-4" />
-                  </div>
-                  Sign Out from All Devices?
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will end your session on all devices including this one. You will need to sign in again.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction className="bg-red-600 hover:bg-red-700 transition-all duration-200" onClick={handleSignOutAll}>
-                  Sign Out All
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                    {signOutCountdown ? (
+                      <span className="flex items-center gap-2">
+                        <Timer className="size-4" /> Signing out in {signOutCountdown}s...
+                      </span>
+                    ) : (
+                      'Sign Out from All Devices'
+                    )}
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="rounded-2xl">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <div className="flex size-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+                        <AlertTriangle className="size-5" />
+                      </div>
+                      <span>Sign Out from All Devices?</span>
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will end your session on all devices including this one. You will need to sign in again.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction className="bg-red-600 hover:bg-red-700 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-200" onClick={handleSignOutAll}>
+                      <LogOut className="size-4 mr-1" /> Sign Out All
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
 
-          {/* Security Tips */}
-          <Card className="rounded-2xl">
+          {/* Security Tips - with glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
@@ -276,8 +347,8 @@ export default function SignOutPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Account is Secure */}
-          <Card className="rounded-2xl border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 overflow-hidden">
+          {/* Account is Secure - glassmorphism */}
+          <Card className="rounded-2xl border-emerald-500/30 bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 overflow-hidden backdrop-blur-sm">
             <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
             <CardContent className="p-5 text-center">
               <div className="relative mx-auto mb-3">
@@ -293,8 +364,8 @@ export default function SignOutPage() {
             </CardContent>
           </Card>
 
-          {/* Before You Go */}
-          <Card className="rounded-2xl">
+          {/* Before You Go - glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Eye className="size-4 text-amber-500" /> Before You Go
@@ -344,11 +415,11 @@ export default function SignOutPage() {
             </CardContent>
           </Card>
 
-          {/* Need Help */}
-          <Card className="rounded-2xl">
+          {/* Need Help - glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                <div className="flex size-7 items-center justify-center rounded-lg bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300">
                   <HelpCircle className="size-4" />
                 </div>
                 Need Help?
@@ -371,8 +442,8 @@ export default function SignOutPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Security Stats */}
-          <Card className="rounded-2xl">
+          {/* Quick Security Stats - glassmorphism */}
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Lock className="size-4 text-emerald-600" /> Session Info

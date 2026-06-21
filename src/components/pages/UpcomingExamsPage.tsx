@@ -23,6 +23,12 @@ import {
   CircleDot,
   Lightbulb,
   X,
+  Timer,
+  BookOpen,
+  Target,
+  ListChecks,
+  GraduationCap,
+  Zap,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -148,6 +154,143 @@ function getPriorityConfig(priority: string) {
         headerBg: 'bg-gradient-to-r from-gray-500 to-gray-600',
       };
   }
+}
+
+function ApplicationChecklist({ exam }: { exam: UpcomingExam }) {
+  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({
+    application: exam.applicationStatus === 'completed',
+    admitCard: exam.admitCard,
+    syllabus: exam.hasSyllabus,
+    reminder: exam.reminderSet,
+    reflection: exam.hasReflection,
+  });
+
+  const checklistItems = [
+    { key: 'application', label: 'Submit Application', icon: ClipboardCheck },
+    { key: 'admitCard', label: 'Download Admit Card', icon: FileDown },
+    { key: 'syllabus', label: 'Review Syllabus', icon: BookOpen },
+    { key: 'reminder', label: 'Set Reminder', icon: Bell },
+    { key: 'reflection', label: 'Post-Exam Reflection', icon: Target },
+  ];
+
+  const completedCount = Object.values(checkedItems).filter(Boolean).length;
+  const progress = Math.round((completedCount / checklistItems.length) * 100);
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <ListChecks className="mr-1 inline size-3.5" />
+          Application Checklist
+        </p>
+        <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+          {completedCount}/{checklistItems.length}
+        </span>
+      </div>
+      {/* Progress bar */}
+      <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className="h-full rounded-full bg-emerald-500 transition-all duration-700 ease-out"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <div className="space-y-2">
+        {checklistItems.map((item) => {
+          const checked = checkedItems[item.key];
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setCheckedItems((prev) => ({ ...prev, [item.key]: !prev[item.key] }))}
+              className="flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-left transition-all duration-200 hover:bg-muted/50"
+            >
+              <div
+                className={cn(
+                  'flex size-5 flex-shrink-0 items-center justify-center rounded-md border-2 transition-all duration-300',
+                  checked
+                    ? 'border-emerald-500 bg-emerald-500 text-white scale-100'
+                    : 'border-muted-foreground/30 bg-background scale-95',
+                )}
+              >
+                {checked ? (
+                  <CheckCircle2 className="size-3.5 animate-in fade-in zoom-in duration-200" />
+                ) : (
+                  <Icon className="size-3 text-muted-foreground/50" />
+                )}
+              </div>
+              <span
+                className={cn(
+                  'text-xs font-medium transition-colors duration-200',
+                  checked
+                    ? 'text-emerald-600 line-through dark:text-emerald-400'
+                    : 'text-foreground',
+                )}
+              >
+                {item.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StudyPlanSuggestion({ daysLeft }: { daysLeft: number }) {
+  const plan = useMemo(() => {
+    if (daysLeft <= 0) return { phase: 'Exam Day!', tips: ['Stay calm and confident.', 'Review key formulas and shortcuts.', 'Get good sleep tonight.'] };
+    if (daysLeft <= 7) return {
+      phase: 'Final Revision',
+      tips: ['Focus on revision, not new topics.', 'Take 1 full mock test daily.', 'Review your mistake journal.', 'Practice time-bound sections.'],
+      hours: '6-8 hours/day',
+    };
+    if (daysLeft <= 21) return {
+      phase: 'Intensive Practice',
+      tips: ['Solve previous year questions.', 'Focus on weak areas identified.', 'Take 2-3 mock tests per week.', 'Revise formulas daily.', 'Practice section-wise tests.'],
+      hours: '5-7 hours/day',
+    };
+    if (daysLeft <= 60) return {
+      phase: 'Structured Preparation',
+      tips: ['Complete remaining syllabus topics.', 'Start topic-wise practice.', 'Create short notes for revision.', 'Begin taking sectional mocks.', 'Build a daily study routine.'],
+      hours: '4-6 hours/day',
+    };
+    return {
+      phase: 'Foundation Building',
+      tips: ['Start with fundamentals and basics.', 'Create a subject-wise study plan.', 'Gather study materials and resources.', 'Set weekly milestones and track progress.', 'Build a consistent daily study habit.'],
+      hours: '3-5 hours/day',
+    };
+  }, [daysLeft]);
+
+  const phaseColor = daysLeft <= 7 ? 'text-red-600 dark:text-red-400' : daysLeft <= 21 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400';
+
+  return (
+    <div className="mt-4 rounded-lg border border-dashed border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
+      <div className="mb-2 flex items-center gap-2">
+        <GraduationCap className="size-4 text-emerald-600 dark:text-emerald-400" />
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Study Plan</p>
+        <Badge variant="outline" className={cn('ml-auto border text-[10px] font-bold', daysLeft <= 7 ? 'border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300')}>
+          {plan.phase}
+        </Badge>
+      </div>
+      {plan.hours && (
+        <p className="mb-2 text-xs text-muted-foreground">
+          <Zap className="mr-1 inline size-3" />
+          Recommended: <span className="font-semibold text-foreground">{plan.hours}</span>
+        </p>
+      )}
+      <ul className="space-y-1">
+        {plan.tips.map((tip, i) => (
+          <li key={i} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <span className="mt-0.5 flex size-3.5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[9px] font-bold text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+              {i + 1}
+            </span>
+            {tip}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 function ApplicationProgress({ status }: { status: string }) {
@@ -646,6 +789,13 @@ export default function UpcomingExamsPage() {
                 const daysRemaining = exam.daysLeft ?? 0;
                 const isNearest = exam.id === timeline[nearestIdx]?.id;
 
+                // Calculate precise countdown (days + hours)
+                const examDate = new Date(exam.examDate);
+                const diffMs = examDate.getTime() - now.getTime();
+                const totalHours = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60)));
+                const countdownDays = Math.floor(totalHours / 24);
+                const countdownHours = totalHours % 24;
+
                 return (
                   <Card
                     key={exam.id}
@@ -664,6 +814,15 @@ export default function UpcomingExamsPage() {
                             </span>
                             <span className="text-[10px] uppercase tracking-wider opacity-90 font-medium">
                               days left
+                            </span>
+                          </div>
+                          <div className="flex flex-col items-center ml-3 px-3 border-l border-white/20">
+                            <div className="flex items-center gap-1">
+                              <Timer className="size-3.5 opacity-80" />
+                              <span className="text-lg font-bold">{countdownHours}h</span>
+                            </div>
+                            <span className="text-[10px] uppercase tracking-wider opacity-70 font-medium">
+                              remaining
                             </span>
                           </div>
                           <div className="min-w-0">
@@ -729,7 +888,7 @@ export default function UpcomingExamsPage() {
                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
                           Application Status
                         </p>
-                        <ApplicationProgress status={exam.applicationStatus} />
+                        <ApplicationChecklist exam={exam} />
                       </div>
 
                       {/* Details grid */}
@@ -829,6 +988,9 @@ export default function UpcomingExamsPage() {
                           </Button>
                         )}
                       </div>
+
+                      {/* Study Plan Suggestion */}
+                      <StudyPlanSuggestion daysLeft={daysRemaining} />
                     </CardContent>
                   </Card>
                 );

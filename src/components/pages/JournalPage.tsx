@@ -18,6 +18,9 @@ import {
   BookOpenCheck,
   CalendarDays,
   Loader2,
+  MessageSquareText,
+  History,
+  Hash,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -420,15 +423,20 @@ function EntryFormDialog({
                   type="button"
                   onClick={() => setMood(m.key)}
                   className={cn(
-                    'flex items-center gap-2 rounded-lg border p-2.5 text-sm font-medium transition-all duration-150',
-                    'hover:scale-[1.02]',
+                    'flex flex-col items-center gap-1 rounded-xl border p-3 transition-all duration-200',
+                    'hover:scale-[1.03] active:scale-[0.97]',
                     mood === m.key
-                      ? `${m.color} ring-2 ${m.ring}`
-                      : 'border-border bg-card text-muted-foreground hover:bg-muted',
+                      ? `${m.color} ring-2 ${m.ring} shadow-sm`
+                      : 'border-border bg-card text-muted-foreground hover:bg-muted hover:border-muted-foreground/30',
                   )}
                 >
-                  <span className="text-lg">{m.emoji}</span>
-                  <span className="text-xs">{m.label}</span>
+                  <span className={cn(
+                    'text-3xl transition-transform duration-200',
+                    mood === m.key && 'scale-110',
+                  )}>
+                    {m.emoji}
+                  </span>
+                  <span className="text-[11px] font-medium">{m.label}</span>
                 </button>
               ))}
             </div>
@@ -436,7 +444,15 @@ function EntryFormDialog({
 
           {/* Content */}
           <div>
-            <Label className="mb-1.5">Journal Entry</Label>
+            <div className="mb-1.5 flex items-center justify-between">
+              <Label>Journal Entry</Label>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Hash className="size-3" />
+                <span>{content.trim().split(/\s+/).filter(Boolean).length} words</span>
+                <span className="text-muted-foreground/50">·</span>
+                <span>{content.length} chars</span>
+              </div>
+            </div>
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -468,6 +484,19 @@ function EntryFormDialog({
                 onChange={(e) => setTopics(e.target.value)}
                 placeholder="DI, Reasoning, GA"
               />
+              {topics.trim() && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {topics.split(',').filter(Boolean).map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50/50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400"
+                    >
+                      <Tag className="size-2.5" />
+                      {t.trim()}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground">Separate topics with commas</p>
@@ -607,6 +636,73 @@ export default function JournalPage() {
                 />
               ))}
             </div>
+          )}
+
+          {/* Previous Entries Mini Timeline */}
+          {!isLoading && entries.length > 1 && (
+            <Card className="border-emerald-200 bg-emerald-50/30 dark:border-emerald-800 dark:bg-emerald-950/10">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                    <History className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <CardTitle className="text-sm font-semibold text-foreground">Previous Entries</CardTitle>
+                  <Badge variant="outline" className="ml-auto border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 text-[10px]">
+                    {entries.length} total
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="max-h-64 space-y-0 overflow-y-auto pr-1">
+                  {entries.slice(0, 10).map((entry, idx) => {
+                    const mood = getMoodConfig(entry.mood);
+                    const wordCount = entry.content.trim().split(/\s+/).filter(Boolean).length;
+                    return (
+                      <div key={entry.id} className="group relative flex gap-3 pb-4 last:pb-0">
+                        {idx < Math.min(entries.length, 10) - 1 && (
+                          <div className="absolute bottom-0 left-[11px] top-6 w-px bg-emerald-200/60 dark:bg-emerald-800/40" />
+                        )}
+                        <div className="relative z-10 mt-1 flex-shrink-0">
+                          <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-emerald-300 bg-background text-xs transition-transform group-hover:scale-110 dark:border-emerald-700">
+                            {mood.emoji}
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1 rounded-lg p-1.5 -m-1.5 transition-colors group-hover:bg-muted/50">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-medium text-foreground truncate">
+                              {formatDate(entry.date)}
+                            </p>
+                            {entry.studyHours != null && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {entry.studyHours}h
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-1">
+                            {entry.content}
+                          </p>
+                          {entry.topics && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {entry.topics.split(',').filter(Boolean).slice(0, 3).map((t) => (
+                                <span
+                                  key={t}
+                                  className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100/60 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                                >
+                                  {t.trim()}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-shrink-0 text-right">
+                          <p className="text-[10px] text-muted-foreground">{wordCount}w</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
           )}
         </div>
 

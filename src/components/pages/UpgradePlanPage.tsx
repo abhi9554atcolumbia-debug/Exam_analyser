@@ -210,24 +210,33 @@ export default function UpgradePlanPage() {
           const isPro = plan.name === 'Pro';
           return (
             <Card key={plan.name} className={cn(
-              'relative flex flex-col rounded-2xl overflow-hidden transition-all duration-200 hover:shadow-lg hover:-translate-y-1',
+              'relative flex flex-col rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-2',
+              'bg-white/90 dark:bg-gray-900/90 backdrop-blur-md',
               plan.current ? 'border-muted' : '',
-              isPremium ? `border-2 ${plan.borderColor} shadow-lg ring-1 ring-emerald-500/20` : '',
-              isPro ? `border-2 ${plan.borderColor} ring-1 ring-amber-500/20` : '',
+              isPremium ? `border-2 ${plan.borderColor} shadow-xl shadow-emerald-500/15 ring-1 ring-emerald-500/20 hover:shadow-2xl hover:shadow-emerald-500/20` : '',
+              isPro ? `border-2 ${plan.borderColor} shadow-xl shadow-amber-500/15 ring-1 ring-amber-500/20 hover:shadow-2xl hover:shadow-amber-500/20` : '',
+              !plan.current && !isPremium && !isPro ? 'hover:shadow-lg' : '',
             )}>
-              {/* Colored Top Bar */}
-              <div className={cn('h-1.5 bg-gradient-to-r', plan.gradientFrom, plan.gradientTo)} />
+              {/* Animated Colored Top Bar with gradient glow */}
+              <div className={cn('h-1.5 bg-gradient-to-r relative', plan.gradientFrom, plan.gradientTo)}>
+                {isPremium && (
+                  <div className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-400 bg-[length:200%_100%] animate-[pulse-glow_2s_ease-in-out_infinite]" />
+                )}
+              </div>
 
-              {/* Badge */}
+              {/* Badge Ribbon */}
               {plan.badge && (
                 <div className={cn(
                   'absolute -top-0 left-1/2 -translate-x-1/2 translate-y-1',
-                  isPremium ? 'bg-emerald-600 text-white shadow-md' :
-                  isPro ? 'bg-amber-500 text-white shadow-md' :
+                  isPremium ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-500/30' :
+                  isPro ? 'bg-gradient-to-r from-amber-500 to-amber-400 text-white shadow-lg shadow-amber-500/30' :
                   'bg-muted text-muted-foreground',
-                  'text-[10px] font-bold px-3 py-1 rounded-b-lg uppercase tracking-wide',
+                  'text-[10px] font-bold px-4 py-1.5 rounded-b-lg uppercase tracking-wider',
                 )}>
-                  {plan.badge}
+                  <span className="flex items-center gap-1">
+                    {(isPremium || isPro) && <Sparkles className="size-2.5" />}
+                    {plan.badge}
+                  </span>
                 </div>
               )}
 
@@ -265,16 +274,16 @@ export default function UpgradePlanPage() {
 
                 <Separator className="mb-4" />
 
-                {/* Features */}
+                {/* Features with animated checkmarks */}
                 <div className="space-y-2.5 flex-1">
                   {plan.features.map((f) => (
                     <div key={f.label} className={cn(
-                      'flex items-center gap-2.5 p-1.5 rounded-lg transition-colors',
-                      f.included ? 'hover:bg-muted/50' : '',
+                      'flex items-center gap-2.5 p-1.5 rounded-lg transition-all duration-200',
+                      f.included ? 'hover:bg-muted/50 hover:translate-x-0.5' : '',
                     )}>
                       {f.included ? (
-                        <div className="flex size-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0">
-                          <Check className="size-3" />
+                        <div className="flex size-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0 transition-transform duration-200 hover:scale-125">
+                          <Check className="size-3" strokeWidth={3} />
                         </div>
                       ) : (
                         <div className="flex size-5 items-center justify-center rounded-full bg-muted text-muted-foreground/40 shrink-0">
@@ -288,13 +297,13 @@ export default function UpgradePlanPage() {
                   ))}
                 </div>
 
-                {/* CTA Button */}
+                {/* CTA Button with glow effect */}
                 <Button
                   className={cn(
-                    'mt-6 w-full transition-all duration-200 hover:-translate-y-0.5',
+                    'mt-6 w-full transition-all duration-300 hover:-translate-y-0.5 relative overflow-hidden',
                     plan.current ? 'bg-muted text-muted-foreground cursor-default hover:bg-muted hover:-translate-y-0' : '',
-                    isPremium && !plan.current ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-md' : '',
-                    isPro && !plan.current ? 'bg-foreground hover:bg-foreground/90 hover:shadow-md' : '',
+                    isPremium && !plan.current ? 'bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/30' : '',
+                    isPro && !plan.current ? 'bg-foreground hover:bg-foreground/90 hover:shadow-lg hover:shadow-amber-500/20' : '',
                   )}
                   onClick={() => {
                     if (plan.current) return;
@@ -303,7 +312,10 @@ export default function UpgradePlanPage() {
                   disabled={plan.current}
                 >
                   {plan.current ? 'Current Plan' : `Upgrade to ${plan.name}`}
-                  {!plan.current && <ArrowRight className="size-4 ml-1" />}
+                  {!plan.current && <ArrowRight className="size-4 ml-1 transition-transform duration-200 group-hover:translate-x-0.5" />}
+                  {!plan.current && (isPremium || isPro) && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
+                  )}
                 </Button>
               </CardContent>
             </Card>
@@ -328,22 +340,30 @@ export default function UpgradePlanPage() {
 
       {/* Compare Plans Table */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-          <BarChart3 className="size-4" /> Compare Plans
-        </h3>
-        <Card className="rounded-2xl overflow-hidden">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5 px-3 py-1.5">
+            <BarChart3 className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Compare Plans</h3>
+          </div>
+          <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/20 to-transparent" />
+        </div>
+        <Card className="rounded-2xl overflow-hidden bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full min-w-[500px]">
               <thead>
-                <tr className="border-b bg-muted/30">
-                  <th className="text-left text-sm font-semibold text-muted-foreground p-4">Feature</th>
+                <tr className="border-b">
+                  <th className="text-left text-sm font-semibold text-muted-foreground p-4 bg-muted/30">Feature</th>
                   {plans.map((p) => (
                     <th key={p.name} className={cn(
-                      'text-center text-sm font-bold p-4',
-                      p.name === 'Premium' ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20' :
-                      p.name === 'Pro' ? 'text-amber-600 bg-amber-50/50 dark:bg-amber-950/20' : '',
+                      'text-center text-sm font-bold p-4 transition-colors',
+                      p.name === 'Premium' ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 dark:text-emerald-400' :
+                      p.name === 'Pro' ? 'text-amber-600 bg-amber-50/50 dark:bg-amber-950/20 dark:text-amber-400' : 'bg-muted/10',
                     )}>
-                      {p.name}
+                      <span className="flex items-center justify-center gap-1">
+                        {p.name === 'Premium' && <Crown className="size-3.5" />}
+                        {p.name === 'Pro' && <Sparkles className="size-3.5" />}
+                        {p.name}
+                      </span>
                     </th>
                   ))}
                 </tr>
@@ -351,10 +371,10 @@ export default function UpgradePlanPage() {
               <tbody>
                 {plans[0].features.map((f, i) => (
                   <tr key={i} className={cn(
-                    'border-b last:border-b-0 transition-colors hover:bg-muted/30',
+                    'border-b last:border-b-0 transition-colors hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10',
                     i % 2 === 1 && 'bg-muted/20',
                   )}>
-                    <td className="text-sm p-4 text-muted-foreground">{f.label}</td>
+                    <td className="text-sm p-4 text-muted-foreground font-medium">{f.label}</td>
                     {plans.map((p) => {
                       const included = p.features[i]?.included;
                       return (
@@ -364,11 +384,11 @@ export default function UpgradePlanPage() {
                           p.name === 'Pro' && included && 'bg-amber-50/30 dark:bg-amber-950/10',
                         )}>
                           {included ? (
-                            <div className="flex size-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 mx-auto">
-                              <Check className="size-3.5" />
+                            <div className="flex size-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 mx-auto transition-transform duration-200 hover:scale-110">
+                              <Check className="size-4" strokeWidth={3} />
                             </div>
                           ) : (
-                            <div className="flex size-6 items-center justify-center rounded-full bg-muted text-muted-foreground/40 mx-auto">
+                            <div className="flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground/40 mx-auto">
                               <X className="size-3.5" />
                             </div>
                           )}
@@ -385,14 +405,18 @@ export default function UpgradePlanPage() {
 
       {/* Benefits */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Zap className="size-4" /> Why Upgrade?
-        </h3>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-500/10 to-cyan-500/10 dark:from-teal-500/5 dark:to-cyan-500/5 px-3 py-1.5">
+            <Zap className="size-3.5 text-teal-600 dark:text-teal-400" />
+            <h3 className="text-xs font-semibold text-teal-700 dark:text-teal-300 uppercase tracking-wider">Why Upgrade?</h3>
+          </div>
+          <div className="flex-1 h-px bg-gradient-to-r from-teal-500/20 to-transparent" />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {benefits.map((b) => {
             const Icon = b.icon;
             return (
-              <Card key={b.title} className={cn('rounded-2xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200')}>
+              <Card key={b.title} className={cn('rounded-2xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm')}>
                 <div className={cn('h-1 bg-gradient-to-r opacity-50', b.gradient.replace(/from-/, 'from-emerald-400/').replace(/to-/, 'to-teal-400/'))} />
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
@@ -413,12 +437,16 @@ export default function UpgradePlanPage() {
 
       {/* Testimonials */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-          <Star className="size-4" /> What Students Say
-        </h3>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/5 dark:to-orange-500/5 px-3 py-1.5">
+            <Star className="size-3.5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">What Students Say</h3>
+          </div>
+          <div className="flex-1 h-px bg-gradient-to-r from-amber-500/20 to-transparent" />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {testimonials.map((t) => (
-            <Card key={t.name} className="rounded-2xl hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+            <Card key={t.name} className="rounded-2xl hover:shadow-lg hover:-translate-y-1 transition-all duration-300 group bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <CardContent className="p-5">
                 <Quote className="size-6 text-emerald-300 dark:text-emerald-700 mb-3" />
                 <p className="text-sm text-muted-foreground leading-relaxed mb-4">{t.quote}</p>
@@ -444,10 +472,14 @@ export default function UpgradePlanPage() {
 
       {/* FAQ */}
       <div>
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-          <HelpCircle className="size-4" /> Frequently Asked Questions
-        </h3>
-        <Card className="rounded-xl">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5 px-3 py-1.5">
+            <HelpCircle className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            <h3 className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Frequently Asked Questions</h3>
+          </div>
+          <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/20 to-transparent" />
+        </div>
+        <Card className="rounded-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardContent className="p-0">
             <Accordion type="single" collapsible className="w-full">
               {faqs.map((faq, i) => (

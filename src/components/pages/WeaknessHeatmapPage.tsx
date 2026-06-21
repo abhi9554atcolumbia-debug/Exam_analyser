@@ -13,6 +13,11 @@ import {
   Shield,
   Crosshair,
   Eye,
+  BookOpen,
+  Clock,
+  Timer,
+  RefreshCw,
+  Lightbulb,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -101,7 +106,7 @@ function TableSkeleton() {
   );
 }
 
-function SectionSkeleton() {
+function SectionSkeleton({ lines = 3 }: { lines?: number }) {
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -684,6 +689,151 @@ export default function WeaknessHeatmapPage() {
               </Card>
             )}
           </div>
+
+          {/* ── Study Recommendations ── */}
+          {heatmap.length > 0 && (
+            <Card className="border-l-4 border-l-emerald-500 transition-shadow duration-200 hover:shadow-md">
+              <CardHeader className="pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+                    <Lightbulb className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-base font-semibold">Study Recommendations</CardTitle>
+                    <CardDescription className="text-xs">
+                      Actionable steps based on your weakness analysis
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    {
+                      icon: Timer,
+                      title: 'Timed Practice Sessions',
+                      description: 'Set a timer for each section during practice. Start with generous limits and gradually reduce to exam conditions.',
+                      priority: focusAreas[0]?.overall && focusAreas[0].overall <= 50 ? 'High' : 'Medium',
+                    },
+                    {
+                      icon: BookOpen,
+                      title: 'Concept-First Revision',
+                      description: 'Before solving problems, review core concepts for your weakest subjects. Build a strong foundation first.',
+                      priority: focusAreas[0]?.overall && focusAreas[0].overall <= 40 ? 'High' : 'Medium',
+                    },
+                    {
+                      icon: RefreshCw,
+                      title: 'Spaced Repetition Schedule',
+                      description: 'Revisit weak topics at increasing intervals (1 day, 3 days, 7 days, 14 days) for long-term retention.',
+                      priority: 'Medium',
+                    },
+                    {
+                      icon: Target,
+                      title: 'Error Log Journaling',
+                      description: 'Maintain a mistake journal. Categorize errors by type and review before each practice session.',
+                      priority: focusAreas[0]?.overall && focusAreas[0].overall <= 30 ? 'High' : 'Medium',
+                    },
+                    {
+                      icon: Shield,
+                      title: 'Mock Test Strategy',
+                      description: 'Take full-length mocks weekly. Focus on maintaining accuracy first, then work on speed.',
+                      priority: 'Medium',
+                    },
+                  ].map((rec, idx) => {
+                    const Icon = rec.icon;
+                    const isHigh = rec.priority === 'High';
+                    return (
+                      <div
+                        key={idx}
+                        className={cn(
+                          'group rounded-xl border p-4 transition-all duration-200 hover:shadow-sm hover:-translate-y-0.5',
+                          isHigh
+                            ? 'border-red-200 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20'
+                            : 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/20',
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div
+                            className={cn(
+                              'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg',
+                              isHigh
+                                ? 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400'
+                                : 'bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400',
+                            )}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{rec.title}</p>
+                            </div>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                'mt-1 border text-[10px] font-bold',
+                                isHigh
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800'
+                                  : 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 border-amber-200 dark:border-amber-800',
+                              )}
+                            >
+                              {rec.priority} Priority
+                            </Badge>
+                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{rec.description}</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* ── Focus Areas Summary Card ── */}
+          {focusAreas.length > 0 && (
+            <Card className="overflow-hidden transition-shadow duration-200 hover:shadow-md">
+              <div className="bg-gradient-to-r from-rose-600 to-orange-600 px-6 py-4">
+                <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Crosshair className="h-4 w-4" />
+                  Focus Areas Summary — Top 3 Weakest Sections
+                </h2>
+              </div>
+              <CardContent className="p-0">
+                <div className="divide-y">
+                  {focusAreas.map((area, idx) => {
+                    const sev = getSeverityBadge(area.overall);
+                    return (
+                      <div
+                        key={area.subject}
+                        className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-muted/30"
+                      >
+                        <span
+                          className={cn(
+                            'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white',
+                            idx === 0 ? 'bg-red-500' : idx === 1 ? 'bg-amber-500' : 'bg-yellow-500',
+                          )}
+                        >
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-foreground">{area.subject}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Weakest in <span className="font-medium text-foreground">{area.weakestArea}</span> (score: {area.weakestScore})
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="text-lg font-bold text-foreground">{area.overall}</p>
+                          <Badge variant="outline" className={cn('border text-[10px] font-bold', sev.cls)}>
+                            {sev.label}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

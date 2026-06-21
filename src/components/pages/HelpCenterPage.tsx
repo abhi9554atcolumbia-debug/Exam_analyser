@@ -5,12 +5,14 @@ import {
   HelpCircle, Search, BookOpen, Target, BrainCircuit, Settings, Mail,
   Phone, MessageCircle, Ticket, Play, Clock, ChevronRight, Sparkles,
   Headphones, FileText, BarChart3, ShieldCheck, BookMarked,
-  GraduationCap, Users,
+  GraduationCap, Users, Send, ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
@@ -24,6 +26,16 @@ const topicBorderColors = [
   'border-l-amber-500',
   'border-l-violet-500',
   'border-l-rose-500',
+];
+
+const faqCategories = [
+  { name: 'Getting Started', items: [0, 1] },
+  { name: 'Features', items: [2, 3] },
+  { name: 'Data & Security', items: [4, 5] },
+];
+
+const contactSubjects = [
+  'Account Issue', 'Feature Request', 'Bug Report', 'Payment Query', 'Other',
 ];
 
 const topics = [
@@ -69,48 +81,66 @@ const supportOptions = [
 export default function HelpCenterPage() {
   const [search, setSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactSubject, setContactSubject] = useState('');
+  const [contactMessage, setContactMessage] = useState('');
+  const [sendingContact, setSendingContact] = useState(false);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-sm">
-            <HelpCircle className="size-5 text-white drop-shadow-sm" />
+      {/* Header with Gradient */}
+      <Card className="rounded-2xl overflow-hidden border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30">
+        <div className="relative px-6 py-6 sm:px-8">
+          <div className="absolute inset-0 opacity-20 overflow-hidden">
+            <div className="absolute -top-8 -right-8 size-40 rounded-full bg-emerald-300/30 blur-2xl" />
+            <div className="absolute -bottom-8 -left-8 size-48 rounded-full bg-teal-300/30 blur-2xl" />
           </div>
-          <div>
-            <h2 className="text-xl font-bold">Help Center</h2>
-            <p className="text-xs text-muted-foreground">Find answers, guides, and support</p>
+          <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-md">
+                <HelpCircle className="size-6 text-white drop-shadow-sm" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Help Center</h2>
+                <p className="text-xs text-muted-foreground">Find answers, guides, and support</p>
+              </div>
+            </div>
+            <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.info('Support contact dialog would open')}>
+              <Headphones className="size-4" /> Contact Support
+            </Button>
           </div>
         </div>
-        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200" onClick={() => toast.info('Support contact dialog would open')}>
-          <Headphones className="size-4" /> Contact Support
-        </Button>
-      </div>
+      </Card>
 
-      {/* Search */}
+      {/* Search with enhanced styling */}
       <div className={cn(
-        'relative transition-all duration-300',
+        'relative transition-all duration-300 group',
         searchFocused && 'scale-[1.01]',
       )}>
         <Search className={cn(
-          'absolute left-4 top-1/2 -translate-y-1/2 size-5 transition-colors duration-200',
-          searchFocused ? 'text-emerald-600' : 'text-muted-foreground',
+          'absolute left-4 top-1/2 -translate-y-1/2 size-5 transition-all duration-200',
+          searchFocused ? 'text-emerald-600 scale-110' : 'text-muted-foreground',
         )} />
         <Input
           placeholder="Search for help articles, FAQs, and guides..."
           className={cn(
-            'pl-12 h-12 rounded-xl text-sm transition-all duration-200',
-            searchFocused && 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md',
+            'pl-12 h-12 rounded-xl text-sm transition-all duration-200 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm',
+            searchFocused && 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10',
           )}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onFocus={() => setSearchFocused(true)}
           onBlur={() => setSearchFocused(false)}
         />
+        {!search && (
+          <kbd className="absolute right-4 top-1/2 -translate-y-1/2 hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md border bg-muted/80 text-[10px] font-mono text-muted-foreground">
+            <span className="text-xs">⌘</span>K
+          </kbd>
+        )}
         {search && (
           <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/20 rounded-md px-1.5 py-0.5 transition-colors"
             onClick={() => setSearch('')}
           >
             Clear
@@ -120,11 +150,15 @@ export default function HelpCenterPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          {/* Topic Cards */}
+          {/* Topic Cards - with gradient section header */}
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <BookMarked className="size-3.5" /> Browse Topics
-            </h3>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5 px-3 py-1.5">
+                <BookMarked className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">Browse Topics</h3>
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-r from-emerald-500/20 to-transparent" />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {topics.map((topic, i) => {
                 const Icon = topic.icon;
@@ -132,22 +166,22 @@ export default function HelpCenterPage() {
                   <Card
                     key={topic.title}
                     className={cn(
-                      'cursor-pointer rounded-xl border-l-[3px] transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 group',
+                      'cursor-pointer rounded-xl border-l-[3px] transition-all duration-200 hover:shadow-lg hover:-translate-y-1 group bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm',
                       topicBorderColors[i],
                     )}
                     onClick={() => toast.info(`${topic.title} section would open`)}
                   >
                     <CardContent className="p-4 flex items-start gap-3">
-                      <div className={cn('flex size-10 items-center justify-center rounded-xl shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-200', topic.color)}>
+                      <div className={cn('flex size-10 items-center justify-center rounded-xl shrink-0 shadow-sm group-hover:scale-110 group-hover:rotate-3 transition-all duration-200', topic.color)}>
                         <Icon className="size-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm group-hover:text-emerald-600 transition-colors">{topic.title}</p>
+                        <p className="font-semibold text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{topic.title}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{topic.description}</p>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <Badge variant="secondary" className="text-[10px] font-semibold">{topic.articles} articles</Badge>
-                        <ChevronRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" />
+                        <ArrowRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all duration-200" />
                       </div>
                     </CardContent>
                   </Card>
@@ -156,30 +190,34 @@ export default function HelpCenterPage() {
             </div>
           </div>
 
-          {/* User Guides */}
+          {/* User Guides - with gradient section header */}
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <GraduationCap className="size-3.5" /> User Guides
-            </h3>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-500/5 dark:to-orange-500/5 px-3 py-1.5">
+                <GraduationCap className="size-3.5 text-amber-600 dark:text-amber-400" />
+                <h3 className="text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase tracking-wider">User Guides</h3>
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-r from-amber-500/20 to-transparent" />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {guides.map((guide) => {
                 const Icon = guide.icon;
                 return (
                   <Card
                     key={guide.title}
-                    className="cursor-pointer rounded-xl overflow-hidden hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group"
+                    className="cursor-pointer rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-1 transition-all duration-200 group bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm"
                     onClick={() => toast.info(`${guide.title} guide would open`)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between mb-2.5">
-                        <div className={cn('flex size-9 items-center justify-center rounded-lg bg-gradient-to-br text-emerald-700 dark:text-emerald-300 shrink-0', guide.gradient)}>
+                        <div className={cn('flex size-9 items-center justify-center rounded-lg bg-gradient-to-br text-emerald-700 dark:text-emerald-300 shrink-0 group-hover:scale-110 transition-transform duration-200', guide.gradient)}>
                           <Icon className="size-4" />
                         </div>
                         <Badge variant="secondary" className="text-[10px] flex items-center gap-1 font-semibold">
                           <Clock className="size-2.5" /> {guide.readTime}
                         </Badge>
                       </div>
-                      <p className="font-semibold text-sm group-hover:text-emerald-600 transition-colors">{guide.title}</p>
+                      <p className="font-semibold text-sm group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">{guide.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{guide.description}</p>
                     </CardContent>
                   </Card>
@@ -188,42 +226,107 @@ export default function HelpCenterPage() {
             </div>
           </div>
 
-          {/* FAQ Accordion */}
+          {/* FAQ Accordion - with category sections and enhanced styling */}
           <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-              <HelpCircle className="size-3.5" /> Frequently Asked Questions
-            </h3>
-            <Card className="rounded-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-teal-500/10 to-cyan-500/10 dark:from-teal-500/5 dark:to-cyan-500/5 px-3 py-1.5">
+                <HelpCircle className="size-3.5 text-teal-600 dark:text-teal-400" />
+                <h3 className="text-xs font-semibold text-teal-700 dark:text-teal-300 uppercase tracking-wider">Frequently Asked Questions</h3>
+              </div>
+              <div className="flex-1 h-px bg-gradient-to-r from-teal-500/20 to-transparent" />
+            </div>
+            <Card className="rounded-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
               <CardContent className="p-0">
                 <Accordion type="single" collapsible className="w-full">
-                  {faqs.map((faq, i) => (
-                    <AccordionItem key={i} value={`faq-${i}`} className="px-5">
-                      <AccordionTrigger className="text-sm font-medium hover:no-underline py-4 hover:text-emerald-600 transition-colors">
-                        {faq.q}
-                      </AccordionTrigger>
-                      <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed">
-                        {faq.a}
-                      </AccordionContent>
-                      {i < faqs.length - 1 && <Separator className="ml-0" />}
-                    </AccordionItem>
+                  {faqCategories.map((cat) => (
+                    <div key={cat.name}>
+                      <div className="px-5 pt-4 pb-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/70 bg-muted/50 px-2 py-0.5 rounded-md">{cat.name}</span>
+                      </div>
+                      {cat.items.map((faqIdx) => (
+                        <AccordionItem key={faqIdx} value={`faq-${faqIdx}`} className="px-5 group">
+                          <AccordionTrigger className="text-sm font-medium hover:no-underline py-3.5 hover:text-emerald-600 dark:hover:text-emerald-400 transition-all duration-200 group-hover:pl-1">
+                            <span className="flex items-center gap-2">
+                              <Sparkles className="size-3.5 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                              {faqs[faqIdx].q}
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="text-sm text-muted-foreground pb-4 leading-relaxed pl-7">
+                            {faqs[faqIdx].a}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                      <Separator className="mx-5" />
+                    </div>
                   ))}
                 </Accordion>
               </CardContent>
             </Card>
           </div>
 
-          {/* Still have questions CTA */}
+          {/* Contact Form CTA */}
           <Card className="rounded-2xl overflow-hidden border-emerald-500/30 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/30 dark:via-teal-950/30 dark:to-emerald-950/30">
             <div className="h-1 bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
-            <CardContent className="p-6 text-center">
-              <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-md mx-auto mb-4">
-                <MessageCircle className="size-7 text-white drop-shadow-sm" />
+            <CardContent className="p-6">
+              <div className="text-center mb-6">
+                <div className="flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/25 mx-auto mb-4">
+                  <Send className="size-6 text-white drop-shadow-sm" />
+                </div>
+                <h3 className="text-lg font-bold">Still have questions?</h3>
+                <p className="text-sm text-muted-foreground mt-1">Can&apos;t find what you&apos;re looking for? Send us a message.</p>
               </div>
-              <h3 className="text-lg font-bold">Still have questions?</h3>
-              <p className="text-sm text-muted-foreground mt-1 mb-5">Can&apos;t find what you&apos;re looking for? Our support team is here to help.</p>
-              <Button className="bg-emerald-600 hover:bg-emerald-700 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 px-6" onClick={() => toast.info('Support contact dialog would open')}>
-                <MessageCircle className="size-4 mr-2" /> Contact Support
-              </Button>
+              <div className="space-y-3 max-w-md mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Name</Label>
+                    <Input placeholder="Your name" className="mt-1 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label className="text-xs text-muted-foreground">Email</Label>
+                    <Input placeholder="you@email.com" type="email" className="mt-1 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Subject</Label>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {contactSubjects.map((sub) => (
+                      <button
+                        key={sub}
+                        className={cn(
+                          'px-2.5 py-1 rounded-lg text-[11px] font-medium transition-all duration-200 border',
+                          contactSubject === sub
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                            : 'bg-white/60 dark:bg-gray-900/60 border-border hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20',
+                        )}
+                        onClick={() => setContactSubject(contactSubject === sub ? '' : sub)}
+                      >
+                        {sub}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Message</Label>
+                  <Textarea placeholder="Describe your issue or question..." className="mt-1 min-h-[80px] bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm" value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} />
+                </div>
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 hover:shadow-lg hover:shadow-emerald-500/25 hover:-translate-y-0.5 transition-all duration-200"
+                  disabled={sendingContact}
+                  onClick={() => {
+                    setSendingContact(true);
+                    setTimeout(() => {
+                      toast.success('Message sent! We\'ll get back to you soon.');
+                      setSendingContact(false);
+                      setContactName('');
+                      setContactEmail('');
+                      setContactSubject('');
+                      setContactMessage('');
+                    }, 1500);
+                  }}
+                >
+                  <Send className="size-4 mr-2" /> {sendingContact ? 'Sending...' : 'Send Message'}
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -231,7 +334,7 @@ export default function HelpCenterPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Video Tutorials */}
-          <Card className="rounded-2xl">
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
@@ -243,7 +346,7 @@ export default function HelpCenterPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {videoTutorials.map((v, i) => (
-                <button key={i} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-muted/80 transition-all duration-200 text-left group" onClick={() => toast.info(`Playing: ${v.title}`)}>
+                <button key={i} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/20 transition-all duration-200 text-left group" onClick={() => toast.info(`Playing: ${v.title}`)}>
                   <div className="relative flex size-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 shrink-0 group-hover:shadow-sm group-hover:scale-105 transition-all duration-200">
                     <Play className="size-4 fill-current" />
                   </div>
@@ -258,7 +361,7 @@ export default function HelpCenterPage() {
           </Card>
 
           {/* Support Options */}
-          <Card className="rounded-2xl">
+          <Card className="rounded-2xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">

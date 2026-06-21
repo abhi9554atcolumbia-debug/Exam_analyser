@@ -1,0 +1,759 @@
+     1→'use client';
+     2→
+     3→import { useState } from 'react';
+     4→import { useQuery } from '@tanstack/react-query';
+     5→import {
+     6→  BarChart3,
+     7→  BookOpen,
+     8→  CalendarDays,
+     9→  CheckCircle2,
+    10→  Clock,
+    11→  TrendingDown,
+    12→  TrendingUp,
+    13→  Target,
+    14→  Trophy,
+    15→  Lightbulb,
+    16→  Zap,
+    17→  GraduationCap,
+    18→  Award,
+    19→} from 'lucide-react';
+    20→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    21→import { Badge } from '@/components/ui/badge';
+    22→import { Button } from '@/components/ui/button';
+    23→import { Skeleton } from '@/components/ui/skeleton';
+    24→import { cn } from '@/lib/utils';
+    25→import { StatCard } from '@/components/ui/StatCard';
+    26→import { ProgressBar } from '@/components/ui/ProgressBar';
+    27→import { TrendLineChart } from '@/components/charts/TrendLineChart';
+    28→import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
+    29→import { DonutChart } from '@/components/charts/DonutChart';
+    30→import {
+    31→  getExams,
+    32→  getScoreTrend,
+    33→  getSubjectPerformance,
+    34→  getCutoffGaps,
+    35→  getCategoryPerformance,
+    36→  getMistakeAnalysis,
+    37→  getJourneyTimeline,
+    38→  getAnalyticsInsights,
+    39→  type Exam,
+    40→} from '@/lib/api';
+    41→import { useNavigationStore } from '@/store/navigation';
+    42→
+    43→/* ─── Period Options ──────────────────────────────────────── */
+    44→const PERIODS = [
+    45→  { label: '3 Months', value: '3m' },
+    46→  { label: '6 Months', value: '6m' },
+    47→  { label: '1 Year', value: '1y' },
+    48→  { label: 'All Time', value: 'all' },
+    49→] as const;
+    50→
+    51→function filterByPeriod(exams: Exam[], period: string): Exam[] {
+    52→  if (period === 'all') return exams;
+    53→  const now = new Date();
+    54→  const monthsMap: Record<string, number> = { '3m': 3, '6m': 6, '1y': 12 };
+    55→  const months = monthsMap[period] ?? 999;
+    56→  const cutoff = new Date(now.getFullYear(), now.getMonth() - months, now.getDate());
+    57→  return exams.filter((e) => new Date(e.examDate) >= cutoff);
+    58→}
+    59→
+    60→/* ─── Section Skeleton ─────────────────────────────────────── */
+    61→function SectionSkeleton({ lines = 4 }: { lines?: number }) {
+    62→  return (
+    63→    <Card className="transition-shadow duration-200 hover:shadow-md">
+    64→      <CardHeader className="pb-2">
+    65→        <Skeleton className="h-5 w-40" />
+    66→      </CardHeader>
+    67→      <CardContent className="space-y-3">
+    68→        {Array.from({ length: lines }).map((_, i) => (
+    69→          <Skeleton key={i} className="h-4 w-full" />
+    70→        ))}
+    71→      </CardContent>
+    72→    </Card>
+    73→  );
+    74→}
+    75→
+    76→function ChartSkeleton() {
+    77→  return (
+    78→    <Card className="transition-shadow duration-200 hover:shadow-md">
+    79→      <CardHeader className="pb-2">
+    80→        <Skeleton className="h-5 w-48" />
+    81→        <Skeleton className="mt-1 h-3 w-64" />
+    82→      </CardHeader>
+    83→      <CardContent>
+    84→        <Skeleton className="h-[280px] w-full rounded-md" />
+    85→      </CardContent>
+    86→    </Card>
+    87→  );
+    88→}
+    89→
+    90→/* ─── Stat Cards Skeleton ──────────────────────────────────── */
+    91→function StatCardsSkeleton() {
+    92→  return (
+    93→    <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+    94→      {Array.from({ length: 5 }).map((_, i) => (
+    95→        <Card key={i} className="gap-0 py-0">
+    96→          <CardHeader className="flex flex-row items-center justify-between pb-2">
+    97→            <Skeleton className="h-4 w-24" />
+    98→            <Skeleton className="h-8 w-8 rounded-lg" />
+    99→          </CardHeader>
+   100→          <CardContent className="pb-4">
+   101→            <Skeleton className="h-8 w-16" />
+   102→            <Skeleton className="mt-1 h-3 w-20" />
+   103→          </CardContent>
+   104→        </Card>
+   105→      ))}
+   106→    </div>
+   107→  );
+   108→}
+   109→
+   110→/* ─── Empty Illustration ───────────────────────────────────── */
+   111→function EmptyChart({ message }: { message: string }) {
+   112→  return (
+   113→    <div className="flex h-[280px] flex-col items-center justify-center gap-3 text-center">
+   114→      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+   115→        <BarChart3 className="h-6 w-6 text-muted-foreground" />
+   116→      </div>
+   117→      <div>
+   118→        <p className="text-sm font-medium text-muted-foreground">{message}</p>
+   119→        <p className="mt-1 text-xs text-muted-foreground/70">
+   120→          Add more exam data to see analytics here.
+   121→        </p>
+   122→      </div>
+   123→    </div>
+   124→  );
+   125→}
+   126→
+   127→/* ─── Main Component ───────────────────────────────────────── */
+   128→export default function AnalyticsPage() {
+   129→  const navigate = useNavigationStore();
+   130→  const [period, setPeriod] = useState<string>('all');
+   131→
+   132→  /* ── Queries ── */
+   133→  const examsQuery = useQuery({ queryKey: ['exams-all'], queryFn: () => getExams({ limit: 100 }) });
+   134→  const scoreTrendQuery = useQuery({ queryKey: ['score-trend'], queryFn: getScoreTrend });
+   135→  const subjectPerfQuery = useQuery({ queryKey: ['subject-perf'], queryFn: getSubjectPerformance });
+   136→  const cutoffGapsQuery = useQuery({ queryKey: ['cutoff-gaps'], queryFn: getCutoffGaps });
+   137→  const categoryPerfQuery = useQuery({ queryKey: ['category-perf'], queryFn: getCategoryPerformance });
+   138→  const mistakeQuery = useQuery({ queryKey: ['mistake-analysis'], queryFn: getMistakeAnalysis });
+   139→  const timelineQuery = useQuery({ queryKey: ['journey-timeline'], queryFn: getJourneyTimeline });
+   140→  const insightsQuery = useQuery({ queryKey: ['analytics-insights'], queryFn: getAnalyticsInsights });
+   141→
+   142→  const allExams: Exam[] = examsQuery.data?.data ?? [];
+   143→  const exams = filterByPeriod(allExams, period);
+   144→
+   145→  /* ── Derived Stats ── */
+   146→  const totalExams = exams.length;
+   147→  const qualified = exams.filter((e) => e.result === 'qualified').length;
+   148→  const avgScore =
+   149→    totalExams > 0
+   150→      ? Math.round(exams.reduce((a, e) => a + (e.score / e.maxScore) * 100, 0) / totalExams)
+   151→      : 0;
+   152→  const avgCutoffGap =
+   153→    totalExams > 0
+   154→      ? (
+   155→          exams.reduce((a, e) => a + (e.cutoffGap ?? 0), 0) / totalExams
+   156→        ).toFixed(1)
+   157→      : '0';
+   158→
+   159→  // Best exam
+   160→  const bestExam = exams.length > 0
+   161→    ? exams.reduce((best, e) => {
+   162→        const pct = (e.score / e.maxScore) * 100;
+   163→        const bestPct = (best.score / best.maxScore) * 100;
+   164→        return pct > bestPct ? e : best;
+   165→      })
+   166→    : null;
+   167→
+   168→  // Improvement rate
+   169→  let improvementRate = 0;
+   170→  if (exams.length >= 4) {
+   171→    const sorted = [...exams].sort(
+   172→      (a, b) => new Date(a.examDate).getTime() - new Date(b.examDate).getTime(),
+   173→    );
+   174→    const firstHalf = sorted.slice(0, Math.floor(sorted.length / 2));
+   175→    const secondHalf = sorted.slice(Math.floor(sorted.length / 2));
+   176→    const firstAvg =
+   177→      firstHalf.reduce((a, e) => a + (e.score / e.maxScore) * 100, 0) / firstHalf.length;
+   178→    const secondAvg =
+   179→      secondHalf.reduce((a, e) => a + (e.score / e.maxScore) * 100, 0) / secondHalf.length;
+   180→    improvementRate = secondAvg > 0 ? Math.round(((secondAvg - firstAvg) / firstAvg) * 100) : 0;
+   181→  }
+   182→
+   183→  /* ── Trend message ── */
+   184→  const trendData = scoreTrendQuery.data ?? [];
+   185→  let trendMessage = '';
+   186→  if (trendData.length >= 2) {
+   187→    const first = trendData[0].score;
+   188→    const last = trendData[trendData.length - 1].score;
+   189→    const diff = last - first;
+   190→    if (diff > 0) trendMessage = `Your score has improved by ${diff.toFixed(1)} points over your journey. Keep going!`;
+   191→    else if (diff < 0) trendMessage = `Your score decreased by ${Math.abs(diff).toFixed(1)} points. Focus on weak areas to bounce back.`;
+   192→    else trendMessage = `Your score has remained consistent. Try pushing for a higher target.`;
+   193→  }
+   194→
+   195→  /* ── Subject color gradient ── */
+   196→  const subjectColor = (score: number) => {
+   197→    if (score >= 75) return 'bg-emerald-600 dark:bg-emerald-500';
+   198→    if (score >= 50) return 'bg-teal-600 dark:bg-teal-500';
+   199→    if (score >= 35) return 'bg-amber-600 dark:bg-amber-500';
+   200→    return 'bg-red-600 dark:bg-red-500';
+   201→  };
+   202→
+   203→  /* ── Insight config ── */
+   204→  const insightConfig = [
+   205→    { icon: TrendingUp, border: 'border-l-emerald-500', bg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' },
+   206→    { icon: Target, border: 'border-l-teal-500', bg: 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300' },
+   207→    { icon: Lightbulb, border: 'border-l-amber-500', bg: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' },
+   208→    { icon: Zap, border: 'border-l-rose-500', bg: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300' },
+   209→  ];
+   210→
+   211→  return (
+   212→    <div className="space-y-6">
+   213→      {/* ── Header + Period Selector ── */}
+   214→      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+   215→        <div>
+   216→          <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+   217→            Analytics
+   218→          </h1>
+   219→          <p className="mt-1 text-sm text-muted-foreground">
+   220→            Deep insights into your exam performance and progress
+   221→          </p>
+   222→        </div>
+   223→        <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
+   224→          {PERIODS.map((p) => (
+   225→            <button
+   226→              key={p.value}
+   227→              onClick={() => setPeriod(p.value)}
+   228→              className={cn(
+   229→                'rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-200',
+   230→                period === p.value
+   231→                  ? 'bg-emerald-600 text-white shadow-sm'
+   232→                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+   233→              )}
+   234→            >
+   235→              {p.label}
+   236→            </button>
+   237→          ))}
+   238→        </div>
+   239→      </div>
+   240→
+   241→      {/* ── 5 Stat Cards ── */}
+   242→      {examsQuery.isLoading ? (
+   243→        <StatCardsSkeleton />
+   244→      ) : (
+   245→        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+   246→          <StatCard
+   247→            icon={BarChart3}
+   248→            label="Total Exams"
+   249→            value={totalExams}
+   250→            change={`${qualified} qualified`}
+   251→            trend={qualified > 0 ? 'up' : 'neutral'}
+   252→          />
+   253→          <StatCard
+   254→            icon={Trophy}
+   255→            label="Qualified"
+   256→            value={qualified}
+   257→            change={
+   258→              totalExams > 0
+   259→                ? `${Math.round((qualified / totalExams) * 100)}% rate`
+   260→                : undefined
+   261→            }
+   262→            trend={qualified > 0 ? 'up' : 'neutral'}
+   263→            colorClass="bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300"
+   264→          />
+   265→          <StatCard
+   266→            icon={Target}
+   267→            label="Avg Score"
+   268→            value={`${avgScore}%`}
+   269→            change={avgScore >= 60 ? 'Above average' : 'Needs improvement'}
+   270→            trend={avgScore >= 60 ? 'up' : 'down'}
+   271→            colorClass="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300"
+   272→          />
+   273→          <StatCard
+   274→            icon={TrendingUp}
+   275→            label="Cutoff Gap (avg)"
+   276→            value={avgCutoffGap}
+   277→            change={Number(avgCutoffGap) > 0 ? 'Above cutoff' : 'Below cutoff'}
+   278→            trend={Number(avgCutoffGap) > 0 ? 'up' : 'up'}
+   279→            colorClass="bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+   280→          />
+   281→          <StatCard
+   282→            icon={Zap}
+   283→            label="Improvement Rate"
+   284→            value={exams.length >= 4 ? `${improvementRate}%` : 'N/A'}
+   285→            change={improvementRate > 0 ? 'Improving' : improvementRate < 0 ? 'Declining' : 'Stable'}
+   286→            trend={improvementRate > 0 ? 'up' : improvementRate < 0 ? 'down' : 'neutral'}
+   287→            colorClass="bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
+   288→          />
+   289→        </div>
+   290→      )}
+   291→
+   292→      {/* ── Performance Summary Card ── */}
+   293→      {!examsQuery.isLoading && totalExams > 0 && (
+   294→        <Card className="overflow-hidden transition-shadow duration-200 hover:shadow-md">
+   295→          <CardContent className="p-0">
+   296→            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+   297→              <h2 className="flex items-center gap-2 text-sm font-semibold text-white">
+   298→                <Award className="h-4 w-4" />
+   299→                Performance Summary
+   300→              </h2>
+   301→            </div>
+   302→            <div className="grid grid-cols-2 gap-px bg-border sm:grid-cols-4 lg:grid-cols-6">
+   303→              {[
+   304→                { label: 'Total Exams', value: String(totalExams), icon: BarChart3 },
+   305→                { label: 'Qualification Rate', value: totalExams > 0 ? `${Math.round((qualified / totalExams) * 100)}%` : '0%', icon: CheckCircle2 },
+   306→                { label: 'Average Score', value: `${avgScore}%`, icon: Target },
+   307→                { label: 'Best Score', value: bestExam ? `${Math.round((bestExam.score / bestExam.maxScore) * 100)}%` : '—', icon: GraduationCap },
+   308→                { label: 'Best Exam', value: bestExam?.name ?? '—', icon: Trophy },
+   309→                { label: 'Improvement', value: exams.length >= 4 ? `${improvementRate > 0 ? '+' : ''}${improvementRate}%` : 'N/A', icon: TrendingUp },
+   310→              ].map((item) => {
+   311→                const Icon = item.icon;
+   312→                return (
+   313→                  <div key={item.label} className="bg-background px-4 py-4">
+   314→                    <div className="flex items-center gap-2 text-muted-foreground">
+   315→                      <Icon className="h-3.5 w-3.5" />
+   316→                      <span className="text-xs font-medium">{item.label}</span>
+   317→                    </div>
+   318→                    <p className="mt-1.5 text-lg font-bold text-foreground">{item.value}</p>
+   319→                  </div>
+   320→                );
+   321→              })}
+   322→            </div>
+   323→          </CardContent>
+   324→        </Card>
+   325→      )}
+   326→
+   327→      {/* ── Score Trend ── */}
+   328→      {scoreTrendQuery.isLoading ? (
+   329→        <ChartSkeleton />
+   330→      ) : (
+   331→        <Card className="transition-shadow duration-200 hover:shadow-md">
+   332→          <CardHeader className="pb-2">
+   333→            <div className="flex items-center gap-2">
+   334→              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+   335→                <TrendingUp className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+   336→              </div>
+   337→              <div>
+   338→                <CardTitle className="text-base font-semibold">Score Trend</CardTitle>
+   339→                <CardDescription className="text-xs">
+   340→                  Track how your scores have changed over time across all exams
+   341→                </CardDescription>
+   342→              </div>
+   343→            </div>
+   344→          </CardHeader>
+   345→          <CardContent>
+   346→            {trendData.length > 0 ? (
+   347→              <>
+   348→                <TrendLineChart
+   349→                  data={trendData}
+   350→                  dataKey="score"
+   351→                  xKey="label"
+   352→                  height={300}
+   353→                />
+   354→                {trendMessage && (
+   355→                  <div className={cn(
+   356→                    'mt-3 flex items-center gap-2 rounded-lg border p-3 text-sm',
+   357→                    trendMessage.includes('improved')
+   358→                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400'
+   359→                      : trendMessage.includes('decreased')
+   360→                        ? 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-400'
+   361→                        : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400',
+   362→                  )}>
+   363→                    <TrendingUp className="h-4 w-4 flex-shrink-0" />
+   364→                    {trendMessage}
+   365→                  </div>
+   366→                )}
+   367→              </>
+   368→            ) : (
+   369→              <EmptyChart message="No exam data available yet. Add exams to see your score trend." />
+   370→            )}
+   371→          </CardContent>
+   372→        </Card>
+   373→      )}
+   374→
+   375→      {/* ── Subject Performance + Category Performance ── */}
+   376→      <div className="grid gap-6 lg:grid-cols-2">
+   377→        {/* Subject Performance */}
+   378→        {subjectPerfQuery.isLoading ? (
+   379→          <SectionSkeleton lines={5} />
+   380→        ) : (
+   381→          <Card className="transition-shadow duration-200 hover:shadow-md">
+   382→            <CardHeader className="pb-2">
+   383→              <div className="flex items-center gap-2">
+   384→                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/50">
+   385→                  <BookOpen className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+   386→                </div>
+   387→                <div>
+   388→                  <CardTitle className="text-base font-semibold">Subject Performance</CardTitle>
+   389→                  <CardDescription className="text-xs">
+   390→                    Average scores per subject across all your exams
+   391→                  </CardDescription>
+   392→                </div>
+   393→              </div>
+   394→            </CardHeader>
+   395→            <CardContent>
+   396→              {subjectPerfQuery.data && subjectPerfQuery.data.length > 0 ? (
+   397→                <div className="space-y-4">
+   398→                  {subjectPerfQuery.data.map((s) => (
+   399→                    <div key={s.subject} className="group">
+   400→                      <div className="mb-1 flex items-center justify-between">
+   401→                        <span className="text-sm font-medium text-foreground">
+   402→                          {s.subject}
+   403→                        </span>
+   404→                        <Badge
+   405→                          variant="outline"
+   406→                          className={cn(
+   407→                            'text-xs font-semibold',
+   408→                            s.score >= 75
+   409→                              ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400'
+   410→                              : s.score >= 50
+   411→                                ? 'border-teal-300 text-teal-700 dark:border-teal-700 dark:text-teal-400'
+   412→                                : s.score >= 35
+   413→                                  ? 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-400'
+   414→                                  : 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-400',
+   415→                          )}
+   416→                        >
+   417→                          {Math.round(s.score)}%
+   418→                        </Badge>
+   419→                      </div>
+   420→                      <ProgressBar
+   421→                        percent={s.score}
+   422→                        color={subjectColor(s.score)}
+   423→                        height="h-2.5"
+   424→                      />
+   425→                    </div>
+   426→                  ))}
+   427→                  <Button
+   428→                    variant="outline"
+   429→                    size="sm"
+   430→                    className="mt-2 w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+   431→                  >
+   432→                    View Detailed Breakdown
+   433→                  </Button>
+   434→                </div>
+   435→              ) : (
+   436→                <EmptyChart message="No subject data available yet." />
+   437→              )}
+   438→            </CardContent>
+   439→          </Card>
+   440→        )}
+   441→
+   442→        {/* Category Performance */}
+   443→        {categoryPerfQuery.isLoading ? (
+   444→          <SectionSkeleton lines={3} />
+   445→        ) : (
+   446→          <Card className="transition-shadow duration-200 hover:shadow-md">
+   447→            <CardHeader className="pb-2">
+   448→              <div className="flex items-center gap-2">
+   449→                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+   450→                  <BarChart3 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+   451→                </div>
+   452→                <div>
+   453→                  <CardTitle className="text-base font-semibold">Category Performance</CardTitle>
+   454→                  <CardDescription className="text-xs">
+   455→                    How you perform across different exam categories
+   456→                  </CardDescription>
+   457→                </div>
+   458→              </div>
+   459→            </CardHeader>
+   460→            <CardContent>
+   461→              {categoryPerfQuery.data && categoryPerfQuery.data.length > 0 ? (
+   462→                <>
+   463→                  <DonutChart
+   464→                    data={categoryPerfQuery.data}
+   465→                    dataKey="score"
+   466→                    nameKey="category"
+   467→                    centerLabel="Avg"
+   468→                    centerValue={
+   469→                      categoryPerfQuery.data.length > 0
+   470→                        ? Math.round(
+   471→                            categoryPerfQuery.data.reduce((a, c) => a + c.score, 0) /
+   472→                              categoryPerfQuery.data.length,
+   473→                          )
+   474→                        : 0
+   475→                    }
+   476→                    height={260}
+   477→                  />
+   478→                  <div className="mt-2 flex flex-wrap justify-center gap-2">
+   479→                    {categoryPerfQuery.data.map((c) => (
+   480→                      <div key={c.category} className="flex items-center gap-1.5 text-xs">
+   481→                        <span
+   482→                          className="inline-block h-2.5 w-2.5 rounded-full"
+   483→                          style={{ backgroundColor: c.color }}
+   484→                        />
+   485→                        <span className="text-muted-foreground">{c.category}</span>
+   486→                      </div>
+   487→                    ))}
+   488→                  </div>
+   489→                  <Button
+   490→                    variant="outline"
+   491→                    size="sm"
+   492→                    className="mt-4 w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+   493→                  >
+   494→                    View Category Insights
+   495→                  </Button>
+   496→                </>
+   497→              ) : (
+   498→                <EmptyChart message="No category data available yet." />
+   499→              )}
+   500→            </CardContent>
+   501→          </Card>
+   502→        )}
+   503→      </div>
+   504→
+   505→      {/* ── Cutoff Gap Analysis ── */}
+   506→      {cutoffGapsQuery.isLoading ? (
+   507→        <ChartSkeleton />
+   508→      ) : (
+   509→        <Card className="transition-shadow duration-200 hover:shadow-md">
+   510→          <CardHeader className="pb-2">
+   511→            <div className="flex items-center gap-2">
+   512→              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+   513→                <Target className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+   514→              </div>
+   515→              <div>
+   516→                <CardTitle className="text-base font-semibold">Cutoff Gap Analysis</CardTitle>
+   517→                <CardDescription className="text-xs">
+   518→                  How far above or below the cutoff you scored in each exam
+   519→                </CardDescription>
+   520→              </div>
+   521→            </div>
+   522→          </CardHeader>
+   523→          <CardContent>
+   524→            {cutoffGapsQuery.data && cutoffGapsQuery.data.length > 0 ? (
+   525→              <>
+   526→                <SimpleBarChart
+   527→                  data={cutoffGapsQuery.data}
+   528→                  dataKey="gap"
+   529→                  xKey="exam"
+   530→                  height={280}
+   531→                />
+   532→                <div className="mt-3 flex items-center justify-center gap-6 text-xs text-muted-foreground">
+   533→                  <div className="flex items-center gap-1.5">
+   534→                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-600" />
+   535→                    Above cutoff (positive)
+   536→                  </div>
+   537→                  <div className="flex items-center gap-1.5">
+   538→                    <span className="inline-block h-2.5 w-2.5 rounded-full bg-red-600" />
+   539→                    Below cutoff (negative)
+   540→                  </div>
+   541→                </div>
+   542→              </>
+   543→            ) : (
+   544→              <EmptyChart message="No cutoff data available yet." />
+   545→            )}
+   546→          </CardContent>
+   547→        </Card>
+   548→      )}
+   549→
+   550→      {/* ── Mistake Analysis + Journey Timeline ── */}
+   551→      <div className="grid gap-6 lg:grid-cols-2">
+   552→        {/* Mistake Analysis */}
+   553→        {mistakeQuery.isLoading ? (
+   554→          <SectionSkeleton lines={4} />
+   555→        ) : (
+   556→          <Card className="transition-shadow duration-200 hover:shadow-md">
+   557→            <CardHeader className="pb-2">
+   558→              <div className="flex items-center gap-2">
+   559→                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-100 dark:bg-rose-900/50">
+   560→                  <TrendingDown className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+   561→                </div>
+   562→                <div>
+   563→                  <CardTitle className="text-base font-semibold">Mistake Analysis</CardTitle>
+   564→                  <CardDescription className="text-xs">
+   565→                    Distribution of your common mistake types across reflections
+   566→                  </CardDescription>
+   567→                </div>
+   568→              </div>
+   569→            </CardHeader>
+   570→            <CardContent>
+   571→              {mistakeQuery.data && mistakeQuery.data.length > 0 ? (
+   572→                <>
+   573→                  <DonutChart
+   574→                    data={mistakeQuery.data}
+   575→                    dataKey="count"
+   576→                    nameKey="type"
+   577→                    centerLabel="Mistakes"
+   578→                    centerValue={mistakeQuery.data.reduce((a, c) => a + c.count, 0)}
+   579→                    height={240}
+   580→                  />
+   581→                  <div className="mt-2 flex max-h-28 flex-col gap-1 overflow-y-auto">
+   582→                    {mistakeQuery.data.map((m) => (
+   583→                      <div key={m.type} className="flex items-center justify-between text-xs">
+   584→                        <div className="flex items-center gap-1.5">
+   585→                          <span
+   586→                            className="inline-block h-2.5 w-2.5 rounded-full"
+   587→                            style={{ backgroundColor: m.color }}
+   588→                          />
+   589→                          <span className="text-muted-foreground">{m.type}</span>
+   590→                        </div>
+   591→                        <span className="font-medium text-foreground">{m.percent}%</span>
+   592→                      </div>
+   593→                    ))}
+   594→                  </div>
+   595→                  <Button
+   596→                    variant="outline"
+   597→                    size="sm"
+   598→                    className="mt-4 w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+   599→                    onClick={() => navigate('reflections')}
+   600→                  >
+   601→                    View All Reflections
+   602→                  </Button>
+   603→                </>
+   604→              ) : (
+   605→                <EmptyChart message="No mistake data yet. Write exam reflections to track mistakes." />
+   606→              )}
+   607→            </CardContent>
+   608→          </Card>
+   609→        )}
+   610→
+   611→        {/* Journey Timeline */}
+   612→        {timelineQuery.isLoading ? (
+   613→          <SectionSkeleton lines={6} />
+   614→        ) : (
+   615→          <Card className="transition-shadow duration-200 hover:shadow-md">
+   616→            <CardHeader className="pb-2">
+   617→              <div className="flex items-center gap-2">
+   618→                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
+   619→                  <CalendarDays className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+   620→                </div>
+   621→                <div>
+   622→                  <CardTitle className="text-base font-semibold">Journey Timeline</CardTitle>
+   623→                  <CardDescription className="text-xs">
+   624→                    Your complete exam journey with results and progress
+   625→                  </CardDescription>
+   626→                </div>
+   627→              </div>
+   628→            </CardHeader>
+   629→            <CardContent>
+   630→              {timelineQuery.data && timelineQuery.data.length > 0 ? (
+   631→                <div className="max-h-[400px] space-y-0 overflow-y-auto pr-1">
+   632→                  {timelineQuery.data.map((item, idx) => {
+   633→                    const isQualified = item.status === 'qualified';
+   634→                    return (
+   635→                      <div key={idx} className="relative flex gap-4 pb-6 last:pb-0 group">
+   636→                        {/* Vertical line */}
+   637→                        {idx < timelineQuery.data.length - 1 && (
+   638→                          <div className="absolute bottom-0 left-[9px] top-6 w-px bg-gradient-to-b from-border to-border/40" />
+   639→                        )}
+   640→                        {/* Dot */}
+   641→                        <div className="relative z-10 mt-1 flex-shrink-0">
+   642→                          <div
+   643→                            className={cn(
+   644→                              'flex h-5 w-5 items-center justify-center rounded-full border-2 transition-transform duration-200 group-hover:scale-110',
+   645→                              isQualified
+   646→                                ? 'border-emerald-500 bg-emerald-100 dark:border-emerald-400 dark:bg-emerald-900/50'
+   647→                                : 'border-red-400 bg-red-100 dark:border-red-500 dark:bg-red-900/50',
+   648→                            )}
+   649→                          >
+   650→                            {isQualified && (
+   651→                              <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+   652→                            )}
+   653→                          </div>
+   654→                        </div>
+   655→                        {/* Content */}
+   656→                        <div className="min-w-0 flex-1 pt-0 rounded-lg p-2 -m-2 transition-colors duration-200 group-hover:bg-muted/50">
+   657→                          <p className="text-sm font-semibold text-foreground">{item.name}</p>
+   658→                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+   659→                            <Clock className="h-3 w-3" />
+   660→                            {new Date(item.date).toLocaleDateString('en-IN', {
+   661→                              day: 'numeric',
+   662→                              month: 'short',
+   663→                              year: 'numeric',
+   664→                            })}
+   665→                          </p>
+   666→                          <div className="mt-1.5 flex items-center gap-2">
+   667→                            <span className="text-sm font-bold text-foreground">
+   668→                              {item.score}%
+   669→                            </span>
+   670→                            <Badge
+   671→                              variant="outline"
+   672→                              className={cn(
+   673→                                'text-[11px] font-semibold transition-colors',
+   674→                                isQualified
+   675→                                  ? 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-400'
+   676→                                  : 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-400',
+   677→                              )}
+   678→                            >
+   679→                              {isQualified ? '✓ Qualified' : '✗ Not Qualified'}
+   680→                            </Badge>
+   681→                          </div>
+   682→                        </div>
+   683→                      </div>
+   684→                    );
+   685→                  })}
+   686→                </div>
+   687→              ) : (
+   688→                <EmptyChart message="No journey data yet. Add exams to build your timeline." />
+   689→              )}
+   690→            </CardContent>
+   691→          </Card>
+   692→        )}
+   693→      </div>
+   694→
+   695→      {/* ── AI Insights ── */}
+   696→      {insightsQuery.isLoading ? (
+   697→        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   698→          {Array.from({ length: 4 }).map((_, i) => (
+   699→            <SectionSkeleton key={i} lines={3} />
+   700→          ))}
+   701→        </div>
+   702→      ) : (
+   703→        <div>
+   704→          <div className="mb-4 flex items-center gap-2">
+   705→            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
+   706→              <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+   707→            </div>
+   708→            <div>
+   709→              <h2 className="text-base font-semibold text-foreground">AI Insights</h2>
+   710→              <p className="text-xs text-muted-foreground">Personalized recommendations based on your exam data</p>
+   711→            </div>
+   712→          </div>
+   713→          {insightsQuery.data && insightsQuery.data.length > 0 ? (
+   714→            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+   715→              {insightsQuery.data.slice(0, 4).map((insight, idx) => {
+   716→                const cfg = insightConfig[idx] || insightConfig[0];
+   717→                const Icon = cfg.icon;
+   718→                return (
+   719→                  <Card
+   720→                    key={idx}
+   721→                    className={cn(
+   722→                      'border-l-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
+   723→                      cfg.border,
+   724→                    )}
+   725→                  >
+   726→                    <CardContent className="flex items-start gap-3 p-4">
+   727→                      <div
+   728→                        className={cn(
+   729→                          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg',
+   730→                          cfg.bg,
+   731→                        )}
+   732→                      >
+   733→                        <Icon className="h-4 w-4" />
+   734→                      </div>
+   735→                      <p className="text-sm leading-relaxed text-muted-foreground">
+   736→                        {insight}
+   737→                      </p>
+   738→                    </CardContent>
+   739→                  </Card>
+   740→                );
+   741→              })}
+   742→            </div>
+   743→          ) : (
+   744→            <Card className="transition-shadow duration-200 hover:shadow-md">
+   745→              <CardContent className="flex h-24 items-center justify-center">
+   746→                <div className="text-center">
+   747→                  <Lightbulb className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
+   748→                  <p className="text-sm text-muted-foreground">
+   749→                    Add more exam data to generate AI insights.
+   750→                  </p>
+   751→                </div>
+   752→              </CardContent>
+   753→            </Card>
+   754→          )}
+   755→        </div>
+   756→      )}
+   757→    </div>
+   758→  );
+   759→}

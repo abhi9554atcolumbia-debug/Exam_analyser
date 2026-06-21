@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || undefined
 
     const where: Prisma.DocumentWhereInput = { userId: USER_ID }
-    if (examName) where.examName = { contains: examName, mode: 'insensitive' }
+    if (examName) where.examName = { contains: examName }
     if (category) where.category = category
     if (year) where.year = year
     if (search) where.OR = [
-      { name: { contains: search, mode: 'insensitive' } },
-      { note: { contains: search, mode: 'insensitive' } },
-      { examName: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search } },
+      { note: { contains: search } },
+      { examName: { contains: search } },
     ]
 
     const orderBy: any = {}
