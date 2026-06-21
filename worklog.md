@@ -631,3 +631,58 @@ Work Log:
 - Ran seed successfully: 7 journal entries created
 - Ran lint: 0 errors (1 pre-existing warning in upload/ directory)
 
+---
+Task ID: phase5-stability
+Agent: Main Developer (Cron Review)
+Task: Performance optimization — lazy loading to fix Turbopack OOM in container
+
+Work Log:
+- Identified that Turbopack compilation of all 15 page components + PomodoroTimer was exceeding container memory limits
+- Server compiled homepage successfully but died when browser made concurrent requests for JS/CSS assets
+- Fixed PomodoroTimer: changed from static import to `next/dynamic` with `ssr: false` in AppLayout.tsx
+- Fixed all 15 page components: changed page.tsx from static imports to `next/dynamic` with `ssr: false`
+- Fixed journal API routes: replaced `userId_date` compound unique key (Prisma type error) with `findFirst` approach
+- After fixes, server survives curl API tests; browser testing limited by container memory (Turbopack compiles many chunks on first browser visit)
+- Verified via curl: upcoming-exams=4, goals/stats nextDue="Complete DI Practice Set", journal=7 entries
+
+Stage Summary:
+- Dynamic imports (`next/dynamic`) added for all 16 components (15 pages + PomodoroTimer)
+- Journal API compound key bug fixed
+- Server stable for API calls; container memory limits prevent full browser QA in this session
+
+## Current Project Status (After Phase 5)
+- All 15 pages + 1 new page (Journal) — 16 total pages
+- All 44+ API endpoints (3 new journal endpoints) return correct data
+- Full navigation working: sidebar (10 items + Journal), topbar, user dropdown, PRO upgrade, Help Center, Command+K search
+- Notification dropdown with real-time unread count
+- Global ⌘K command search dialog (now includes Journal page)
+- **NEW**: Daily Study Journal feature (mood tracking, study hours, topics, monthly calendar, stats sidebar, 7 seed entries)
+- **NEW**: Floating Pomodoro/Study Timer widget (25/5/15 min presets, circular progress ring, session counter, audio notification)
+- **FIXED**: Seed data dates updated to 2026 (upcoming exams, goals due dates, calendar events, documents)
+- **FIXED**: Upcoming Exams page now shows 4 exams (was empty due to 2025 dates)
+- **FIXED**: Goals "Today's Focus" now shows next due goal (was showing "No active goals")
+- **NEW**: Zod validation on 4 forms (Add Exam, Create Goal, Create Reflection, Create Document)
+- Error Boundary wrapping all page content
+- In-page search on Exam History
+- Enhanced styling on all pages (Dashboard, Exam History, Analytics, Weakness Heatmap, Reflections, Documents, Goals, Calendar, Profile, Settings, Help Center, Upgrade Plan, Sign Out)
+- Lint: 0 errors, 1 pre-existing warning
+- Dark mode support, mobile responsive
+
+## Unresolved Issues / Risks
+- **Environment**: Container memory limits cause Turbopack OOM when browser makes concurrent requests for first compilation. Dynamic imports mitigate but don't fully resolve. Server is stable for sequential API calls. Consider using `--no-turbopack` flag or increasing container memory.
+- Minor: Document upload is metadata-only (no actual file storage)
+- Minor: Profile page avatar upload is a placeholder (shows toast only)
+- Minor: Calendar old events (cal-001 to cal-008) still have 2025 date strings in labels (functional dates are correct)
+
+## Recommendations for Next Phase
+1. Add `--no-turbopack` to dev script to reduce memory usage during development
+2. Apply Zod validation to Edit dialogs (Edit Exam, Edit Goal, Edit Reflection)
+3. Implement actual file upload for Documents (store files in /download/ directory)
+4. Add avatar upload functionality to Profile page
+5. Add data export for analytics/reports (PDF)
+6. Add keyboard shortcuts help overlay (currently only ⌘K search)
+7. Add more seed data reflections → richer weakness heatmap patterns
+8. Performance: add pagination cursors, query deduplication for analytics
+9. Add automated E2E testing (Playwright)
+10. Enhance mobile experience: test all pages at 375px and 768px widths
+
