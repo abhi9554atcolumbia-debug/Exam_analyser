@@ -40,8 +40,8 @@ const NAV_ITEMS: { id: PageId; label: string; icon: React.ElementType }[] = [
   { id: 'history', label: 'Exam History', icon: History },
   { id: 'upcoming', label: 'Upcoming Exams', icon: CalendarClock },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'weakness-heatmap', label: 'Weakness Heatmap', icon: Flame },
-  { id: 'reflections', label: 'Reflections', icon: FileText },
+  // { id: 'weakness-heatmap', label: 'Weakness Heatmap', icon: Flame },
+  // { id: 'reflections', label: 'Reflections', icon: FileText },
   { id: 'documents', label: 'Documents', icon: FolderOpen },
   { id: 'goals', label: 'Goals & Plans', icon: Target },
   { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -144,9 +144,9 @@ function SidebarContent() {
         </nav>
 
         {/* Upgrade CTA */}
-        {!isPro && (
-          <div className="mt-4">
-            <button
+        {/* {!isPro && (
+          <div className="mt-4"> */}
+            {/* <button
               onClick={() => handleNav('upgrade')}
               className={cn(
                 'group w-full rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50 p-4 text-left transition-all duration-200',
@@ -168,9 +168,9 @@ function SidebarContent() {
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Unlock analytics, AI insights & more
               </p>
-            </button>
-          </div>
-        )}
+            </button> */}
+          {/* </div>
+        )} */}
       </ScrollArea>
 
       <Separator className="shrink-0" />

@@ -974,48 +974,6 @@ function ExamDetailContent({
   );
 }
 
-// ─── CSV Export ────────────────────────────────────────────
-function exportExamsCSV(exams: Exam[]) {
-  const headers = [
-    'Name',
-    'Organization',
-    'Category',
-    'Stage',
-    'Date',
-    'Score',
-    'Max Score',
-    'Cutoff',
-    'Gap',
-    'Result',
-    'Attempt',
-  ];
-  const rows = exams.map((e) => [
-    `"${e.name}"`,
-    `"${e.org || ''}"`,
-    e.category,
-    e.stage,
-    e.examDate,
-    e.score,
-    e.maxScore,
-    e.cutoff,
-    e.cutoffGap ?? '',
-    e.result,
-    e.attempt,
-  ]);
-
-  const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join(
-    '\n',
-  );
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `exam-history-${new Date().toISOString().split('T')[0]}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-}
 
 // ─── Exam History Page ─────────────────────────────────────
 export default function ExamHistoryPage() {
@@ -1074,19 +1032,19 @@ export default function ExamHistoryPage() {
     const avgScore =
       total > 0
         ? Math.round(
-            (filteredExams.reduce(
-              (s, e) => s + (e.score / e.maxScore) * 100,
-              0,
-            ) /
-              total) *
-              10,
-          ) / 10
+          (filteredExams.reduce(
+            (s, e) => s + (e.score / e.maxScore) * 100,
+            0,
+          ) /
+            total) *
+          10,
+        ) / 10
         : 0;
     const bestScore =
       total > 0
         ? Math.round(
-            (Math.max(...filteredExams.map((e) => e.score / e.maxScore)) * 100) * 10,
-          ) / 10
+          (Math.max(...filteredExams.map((e) => e.score / e.maxScore)) * 100) * 10,
+        ) / 10
         : 0;
     return { total, qualified, avgScore, bestScore };
   }, [filteredExams]);
@@ -1117,14 +1075,6 @@ export default function ExamHistoryPage() {
     navigate('reflections');
   }, [navigate]);
 
-  const handleExportCSV = useCallback(() => {
-    if (exams.length === 0) {
-      toast.info('No exams to export.');
-      return;
-    }
-    exportExamsCSV(exams);
-    toast.success(`Exported ${exams.length} exams to CSV!`);
-  }, [exams]);
 
   const handleEditDialogClose = useCallback((open: boolean) => {
     setEditExamOpen(open);
@@ -1162,15 +1112,6 @@ export default function ExamHistoryPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportCSV}
-            className="gap-1.5"
-          >
-            <Download className="size-3.5" />
-            Export CSV
-          </Button>
-          <Button
             onClick={() => setAddExamOpen(true)}
             className="bg-emerald-600 text-white hover:bg-emerald-700"
           >
@@ -1186,11 +1127,6 @@ export default function ExamHistoryPage() {
           <GraduationCap className="size-4 text-emerald-600 dark:text-emerald-400" />
           <span className="text-sm font-medium text-foreground">{stats.total}</span>
           <span className="text-xs text-muted-foreground">Total</span>
-        </div>
-        <div className="flex items-center gap-2 rounded-full border bg-teal-50 px-3 py-1.5 dark:bg-teal-950/30 dark:border-teal-800/50">
-          <Trophy className="size-4 text-teal-600 dark:text-teal-400" />
-          <span className="text-sm font-medium text-foreground">{stats.qualified}</span>
-          <span className="text-xs text-muted-foreground">Qualified</span>
         </div>
         <div className="flex items-center gap-2 rounded-full border bg-amber-50 px-3 py-1.5 dark:bg-amber-950/30 dark:border-amber-800/50">
           <BarChart3 className="size-4 text-amber-600 dark:text-amber-400" />

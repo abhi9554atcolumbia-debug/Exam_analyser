@@ -554,41 +554,8 @@ export default function CalendarPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Activity Streak */}
-        <Card className="transition-shadow duration-200 hover:shadow-md">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-900/50">
-                <Flame className="size-4 text-orange-500" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold">Activity Streak</CardTitle>
-                <CardDescription className="text-xs">Last 7 days</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold mb-3 text-center">
-              {weekDots.filter(Boolean).length} <span className="text-sm font-normal text-muted-foreground">active days</span>
-            </p>
-            <div className="flex gap-2 justify-center mb-2">
-              {weekDots.map((d, i) => (
-                <div key={i} className="flex flex-col items-center gap-1">
-                  <div
-                    className={cn(
-                      'size-7 rounded-full transition-all duration-200',
-                      d ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30' : 'bg-muted',
-                    )}
-                  />
-                  <span className="text-[10px] text-muted-foreground font-medium">
-                    {['M', 'T', 'W', 'T', 'F', 'S', 'S'][i]}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        
+         
       </div>
 
       {/* Create Event Dialog */}

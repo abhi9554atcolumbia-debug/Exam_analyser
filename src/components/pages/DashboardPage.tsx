@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {
@@ -15,14 +15,13 @@ import {
   TrendingUp,
   Clock,
   AlertTriangle,
+  Calendar,
   CheckCircle2,
   XCircle,
   Lightbulb,
   ArrowRight,
   Sparkles,
-  Sun,
-  Moon,
-  CloudSun,
+
   Flame,
   Zap,
   Activity,
@@ -72,12 +71,6 @@ import { useNavigationStore } from '@/store/navigation';
 import { cn } from '@/lib/utils';
 
 // ─── Helpers ───────────────────────────────────────────────
-function getGreeting(): { text: string; icon: typeof Sun } {
-  const h = new Date().getHours();
-  if (h < 12) return { text: 'Good morning', icon: Sun };
-  if (h < 17) return { text: 'Good afternoon', icon: CloudSun };
-  return { text: 'Good evening', icon: Moon };
-}
 
 function formatDate(dateStr: string): string {
   const d = new Date(dateStr);
@@ -107,10 +100,11 @@ function getMotivationalQuote(): string {
   ];
   const dayOfYear = Math.floor(
     (Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) /
-      86400000,
+    86400000,
   );
   return quotes[dayOfYear % quotes.length];
 }
+
 
 function getWeekStreakDots(): boolean[] {
   // Simulated 7-day streak: last 7 days (today = last)
@@ -458,12 +452,7 @@ function AddExamDialog({
 export default function DashboardPage() {
   const navigate = useNavigationStore((s) => s.navigate);
   const [addExamOpen, setAddExamOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
 
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
@@ -474,13 +463,11 @@ export default function DashboardPage() {
     if (!data) return 0;
     return data.stats.totalExams > 0
       ? Math.round(
-          (data.stats.qualified / data.stats.totalExams) * 100,
-        )
+        (data.stats.qualified / data.stats.totalExams) * 100,
+      )
       : 0;
   }, [data]);
 
-  const greeting = getGreeting();
-  const GreetingIcon = greeting.icon;
   const weekDots = useMemo(() => getWeekStreakDots(), []);
   const nextExamCountdown = useMemo(() => {
     if (!data?.nextExam?.examDate) return null;
@@ -501,40 +488,7 @@ export default function DashboardPage() {
   }, [data]);
 
   return (
-    <div className="relative space-y-6 pb-20 md:pb-6">
-      {/* ─── Greeting Section ───────────────────────────────── */}
-      <div className="relative overflow-hidden rounded-2xl border border-border/50 bg-gradient-to-br from-emerald-50 via-white to-teal-50/50 px-5 py-5 shadow-sm sm:px-6 sm:py-6 dark:from-emerald-950/30 dark:via-card dark:to-teal-950/10">
-        {/* Decorative gradient circles */}
-        <div className="pointer-events-none absolute -right-8 -top-8 size-32 rounded-full bg-gradient-to-br from-emerald-200/30 to-teal-200/20 blur-2xl dark:from-emerald-700/10 dark:to-teal-700/10" />
-        <div className="pointer-events-none absolute -bottom-6 -left-6 size-24 rounded-full bg-gradient-to-tr from-teal-200/20 to-emerald-200/10 blur-xl dark:from-teal-700/10 dark:to-emerald-700/5" />
-
-        <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-4">
-            <div className="mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-md shadow-emerald-500/20">
-              <GreetingIcon className="size-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-                {greeting.text}, Aman 👋
-              </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Welcome back! You&apos;ve tracked{' '}
-                <span className="font-semibold text-foreground">
-                  {data?.stats.totalExams ?? 0} exam{((data?.stats.totalExams ?? 0) !== 1) ? 's' : ''}
-                </span>{' '}
-                so far. Keep pushing forward!
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Clock className="size-3.5" />
-            <span>
-              {currentTime.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' })}
-            </span>
-          </div>
-        </div>
-      </div>
-
+    <div className="relative space-y-6 pb-20 md:pb-6" style={{ zoom: 0.8 }}>
       {/* ─── Motivational Quote ─────────────────────────────── */}
       <div className="flex items-start gap-3 rounded-xl border border-border/50 bg-gradient-to-r from-teal-50/60 to-transparent px-4 py-3 dark:from-teal-950/15 dark:to-transparent">
         <Lightbulb className="mt-0.5 size-4 shrink-0 text-teal-600 dark:text-teal-400" />
@@ -543,53 +497,58 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* ─── Stat Cards ─────────────────────────────────────── */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[130px] rounded-2xl" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            icon={GraduationCap}
-            label="Total Exams"
-            value={data?.stats.totalExams ?? 0}
-            change="+2 this month"
-            trend="up"
-            color="emerald"
-            pattern
-          />
-          <StatCard
-            icon={Trophy}
-            label="Qualified"
-            value={`${qualificationRate}%`}
-            change={`${data?.stats.qualified ?? 0} exams`}
-            trend={qualificationRate >= 50 ? 'up' : 'down'}
-            color="teal"
-            pattern
-          />
-          <StatCard
-            icon={BarChart3}
-            label="Average Score"
-            value={`${data?.stats.avgScore ?? 0}%`}
-            change="+3.2% from last"
-            trend="up"
-            color="amber"
-            pattern
-          />
-          <StatCard
-            icon={Target}
-            label="Avg Cutoff Gap"
-            value={data?.stats.avgCutoffGap ?? 0}
-            change={data && data.stats.avgCutoffGap > 0 ? 'Above cutoff' : 'Below cutoff'}
-            trend={data && data.stats.avgCutoffGap <= 0 ? 'up' : 'down'}
-            color={data && data.stats.avgCutoffGap > 0 ? 'red' : 'emerald'}
-            pattern
-          />
-        </div>
-      )}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Exams */}
+        <StatCard
+          icon={GraduationCap}
+          label="Total Exams"
+          value={data?.stats.totalExams ?? 0}
+          change="+2 this month"
+          trend="up"
+          color="emerald"
+          pattern
+        />
+
+        {/* Next Exam */}
+        <StatCard
+          icon={Calendar}
+          label="Next Exam"
+          value={data?.nextExam?.examName ?? "No Exam"}
+          change={
+            data?.nextExam
+              ? `${Math.ceil(
+                (new Date(data.nextExam.examDate).getTime() - Date.now()) /
+                (1000 * 60 * 60 * 24)
+              )} days left`
+              : "No upcoming exam"
+          }
+          trend="up"
+          color="blue"
+          pattern
+        />
+
+        {/* Average Score */}
+        <StatCard
+          icon={BarChart3}
+          label="Average Score"
+          value={`${data?.stats.avgScore ?? 0}%`}
+          change="+3.2% from last"
+          trend="up"
+          color="amber"
+          pattern
+        />
+
+        {/* Percentile */}
+        <StatCard
+          icon={Target}
+          label="Top"
+          value={`${data?.stats.percentile ?? 0}%`}
+          change="Percentile Rank"
+          trend="up"
+          color="emerald"
+          pattern
+        />
+      </div>
 
       {/* ─── Section Divider ────────────────────────────────── */}
       <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
@@ -668,9 +627,9 @@ export default function DashboardPage() {
                     i === 6 && active && 'ring-2 ring-emerald-400/50 ring-offset-2 ring-offset-background dark:ring-emerald-500/30',
                   )}
                 >
-                  {active && (
+                  {/* {active && (
                     <CheckCircle2 className="size-4 text-white sm:size-5 sm:p-0.5" />
-                  )}
+                  )} */}
                 </div>
                 <span className={cn(
                   'text-[10px] font-medium',
@@ -689,94 +648,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-
-      {/* ─── Section Divider ────────────────────────────────── */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-
-      {/* ─── Quick Actions ──────────────────────────────────── */}
-      <div>
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          <Zap className="size-3.5" />
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Button
-            variant="outline"
-            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
-            onClick={() => setAddExamOpen(true)}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-teal-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-emerald-950/0 dark:to-teal-950/0" />
-            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-500/20">
-              <Plus className="size-5 text-white" />
-            </div>
-            <div className="relative text-center">
-              <span className="text-sm font-semibold text-foreground">Add Exam</span>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Record a new result</p>
-            </div>
-          </Button>
-          <Button
-            variant="outline"
-            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-teal-300 hover:bg-teal-50 hover:shadow-md dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
-            onClick={() => navigate('upcoming')}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-50/0 to-cyan-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-teal-950/0 dark:to-cyan-950/0" />
-            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 shadow-sm shadow-teal-500/20">
-              <CalendarPlus className="size-5 text-white" />
-            </div>
-            <div className="relative text-center">
-              <span className="text-sm font-semibold text-foreground">Schedule Exam</span>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Plan your next attempt</p>
-            </div>
-          </Button>
-          <Button
-            variant="outline"
-            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
-            onClick={() => navigate('documents')}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-teal-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-emerald-950/0 dark:to-teal-950/0" />
-            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-500/20">
-              <Upload className="size-5 text-white" />
-            </div>
-            <div className="relative text-center">
-              <div className="flex items-center justify-center gap-1">
-                <span className="text-sm font-semibold text-foreground">Upload Scorecard</span>
-                <Badge className="bg-emerald-600 text-[9px] px-1.5 py-0">NEW</Badge>
-              </div>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Attach your score PDF</p>
-            </div>
-          </Button>
-          <Button
-            variant="outline"
-            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-teal-300 hover:bg-teal-50 hover:shadow-md dark:hover:border-teal-700 dark:hover:bg-teal-950/30"
-            onClick={() => navigate('reflections')}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-teal-50/0 to-cyan-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-teal-950/0 dark:to-cyan-950/0" />
-            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 shadow-sm shadow-teal-500/20">
-              <BookOpen className="size-5 text-white" />
-            </div>
-            <div className="relative text-center">
-              <span className="text-sm font-semibold text-foreground">Add Reflection</span>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Analyze your performance</p>
-            </div>
-          </Button>
-          <Button
-            variant="outline"
-            className="group relative h-auto flex-col gap-3 overflow-hidden rounded-2xl border py-5 shadow-sm transition-all duration-200 hover:scale-[1.02] hover:border-emerald-300 hover:bg-emerald-50 hover:shadow-md dark:hover:border-emerald-700 dark:hover:bg-emerald-950/30"
-            onClick={() => navigate('journal')}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/0 to-teal-50/0 opacity-0 transition-opacity duration-300 group-hover:opacity-100 dark:from-emerald-950/0 dark:to-teal-950/0" />
-            <div className="relative flex size-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm shadow-emerald-500/20">
-              <BookOpen className="size-5 text-white" />
-            </div>
-            <div className="relative text-center">
-              <span className="text-sm font-semibold text-foreground">Write Journal</span>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">Log today&apos;s study</p>
-            </div>
-          </Button>
-        </div>
-      </div>
-
-      {/* ─── Section Divider ────────────────────────────────── */}
+  
       <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
       {/* ─── Score Trend ────────────────────────────────────── */}
@@ -815,233 +687,7 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* ─── Section Divider ────────────────────────────────── */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
-      {/* ─── Two column grid: Weak Areas + Recent Activity ──── */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Weak Areas */}
-        <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Target className="size-4 text-amber-500" />
-              Weak Areas
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-emerald-600 dark:text-emerald-400"
-              onClick={() => navigate('weakness-heatmap')}
-            >
-              Heatmap
-              <ArrowRight className="ml-1 size-4" />
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-2.5 w-full" />
-                </div>
-              ))
-            ) : data && data.weakAreas.length > 0 ? (
-              data.weakAreas.map((area, idx) => (
-                <div key={area.section} className={cn('space-y-2 rounded-xl p-3 -mx-1 transition-colors', idx % 2 === 1 && 'bg-muted/30')}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className={cn('size-2 rounded-full', getSeverityColor(area.avgScore))} />
-                      <span className="text-sm font-medium text-foreground">
-                        {area.section}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          'text-[10px] px-1.5 py-0',
-                          area.avgScore >= 60 && 'border-emerald-300 text-emerald-700 dark:border-emerald-700 dark:text-emerald-300',
-                          area.avgScore >= 40 && area.avgScore < 60 && 'border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300',
-                          area.avgScore < 40 && 'border-red-300 text-red-700 dark:border-red-700 dark:text-red-300',
-                        )}
-                      >
-                        {getSeverityLabel(area.avgScore)}
-                      </Badge>
-                    </div>
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {area.avgScore}%
-                    </span>
-                  </div>
-                  <ProgressBar
-                    percent={area.avgScore}
-                    color={
-                      area.avgScore >= 60
-                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-400 dark:from-emerald-600 dark:to-emerald-400'
-                        : area.avgScore >= 40
-                          ? 'bg-gradient-to-r from-amber-500 to-amber-400 dark:from-amber-600 dark:to-amber-400'
-                          : 'bg-gradient-to-r from-red-500 to-red-400 dark:from-red-600 dark:to-red-400'
-                    }
-                    height="h-2.5"
-                    animated={area.avgScore < 60}
-                    showPercentAtEnd
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {area.avgScore >= 60
-                      ? 'Good performance. Maintain consistency.'
-                      : area.avgScore >= 40
-                        ? 'Needs improvement. Practice more problems.'
-                        : 'Critical area. Focus on fundamentals.'}
-                    {' '}Across {area.exams} exam{area.exams !== 1 ? 's' : ''}.
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No weak areas identified yet.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Recent Activity Timeline */}
-        <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Clock className="size-4 text-emerald-600 dark:text-emerald-400" />
-              Recent Activity
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-emerald-600 dark:text-emerald-400"
-              onClick={() => navigate('history')}
-            >
-              View All
-              <ArrowRight className="ml-1 size-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-4">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16 w-full rounded-lg" />
-                ))}
-              </div>
-            ) : recentActivity.length > 0 ? (
-              <div className="relative space-y-0">
-                {/* Vertical timeline line */}
-                <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" />
-                {recentActivity.map((item, i) => {
-                  const ItemIcon = item.icon;
-                  return (
-                    <div key={item.id} className="group relative flex gap-4 py-3">
-                      {/* Timeline dot */}
-                      <div
-                        className={cn(
-                          'relative z-10 mt-0.5 flex size-[30px] shrink-0 items-center justify-center rounded-full border-2 border-background',
-                          item.type === 'success' && 'bg-emerald-500',
-                          item.type === 'pending' && 'bg-amber-500',
-                          item.type === 'info' && 'bg-muted-foreground/30',
-                        )}
-                      >
-                        <ItemIcon className="size-3.5 text-white" />
-                      </div>
-                      {/* Content */}
-                      <div className="min-w-0 flex-1 rounded-lg p-1 transition-colors group-hover:bg-muted/30">
-                        <p className="text-sm font-medium text-foreground truncate">
-                          {item.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {item.description}
-                        </p>
-                        <p className="mt-1 text-[11px] text-muted-foreground/70">
-                          {item.time}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No recent activity to show.
-              </p>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* ─── Section Divider ────────────────────────────────── */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
-
-      {/* ─── Upcoming Deadlines ─────────────────────────────── */}
-      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <CalendarPlus className="size-4 text-teal-600 dark:text-teal-400" />
-            Upcoming Deadlines
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-emerald-600 dark:text-emerald-400"
-            onClick={() => navigate('upcoming')}
-          >
-            Manage
-            <ArrowRight className="ml-1 size-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 rounded-xl" />
-              ))}
-            </div>
-          ) : data && data.upcomingDeadlines.length > 0 ? (
-            <div className="space-y-3">
-              {data.upcomingDeadlines.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between rounded-xl border border-border/50 p-3.5 transition-all duration-200 hover:border-border hover:bg-muted/30 hover:shadow-sm"
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={cn(
-                        'flex size-10 items-center justify-center rounded-xl',
-                        (item.daysLeft ?? 0) <= 7
-                          ? 'bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400'
-                          : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400',
-                      )}
-                    >
-                      <Clock className="size-4" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">{item.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(item.examDate)}
-                      </p>
-                    </div>
-                  </div>
-                  <Badge
-                    variant={
-                      (item.daysLeft ?? 0) <= 7 ? 'destructive' : 'secondary'
-                    }
-                    className="rounded-lg text-xs font-medium"
-                  >
-                    {formatCountdown(item.daysLeft)}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              No upcoming deadlines. Add exams to stay on track.
-            </p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ─── Section Divider ────────────────────────────────── */}
-      <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
       {/* ─── Recent Exams Table ─────────────────────────────── */}
       <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
@@ -1133,69 +779,7 @@ export default function DashboardPage() {
       <div className="h-px bg-gradient-to-r from-transparent via-border to-transparent" />
 
       {/* ─── Smart Insights ─────────────────────────────────── */}
-      <Card className="overflow-hidden rounded-2xl border-border/50 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="flex items-center gap-2 text-base font-semibold">
-            <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400" />
-            Smart Insights
-          </CardTitle>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-emerald-600 dark:text-emerald-400"
-            onClick={() => navigate('analytics')}
-          >
-            See All Insights
-            <ArrowRight className="ml-1 size-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : data && data.smartInsights.length > 0 ? (
-            <ul className="space-y-3">
-              {data.smartInsights.map((insight, i) => (
-                <li
-                  key={i}
-                  className="flex items-start gap-3 rounded-xl border border-border/50 p-3.5 transition-all duration-200 hover:border-border hover:bg-muted/30 hover:shadow-sm"
-                >
-                  <div className={cn(
-                    'mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl',
-                    insight.includes('improvement') || insight.includes('momentum')
-                      ? 'bg-emerald-100 dark:bg-emerald-900/40'
-                      : insight.includes('⚠️')
-                        ? 'bg-amber-100 dark:bg-amber-900/40'
-                        : insight.includes('weak') || insight.includes('dipped')
-                          ? 'bg-red-100 dark:bg-red-900/40'
-                          : 'bg-emerald-100 dark:bg-emerald-900/40',
-                  )}>
-                    {insight.includes('improvement') || insight.includes('momentum') ? (
-                      <TrendingUp className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    ) : insight.includes('⚠️') ? (
-                      <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
-                    ) : insight.includes('weak') || insight.includes('dipped') ? (
-                      <Target className="size-4 text-red-600 dark:text-red-400" />
-                    ) : (
-                      <Lightbulb className="size-4 text-emerald-600 dark:text-emerald-400" />
-                    )}
-                  </div>
-                  <p className="text-sm leading-relaxed text-foreground">
-                    {insight}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Add more exam data to generate personalized insights.
-            </p>
-          )}
-        </CardContent>
-      </Card>
+
 
       {/* ─── View Full Analytics ────────────────────────────── */}
       <div className="flex justify-center">

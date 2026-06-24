@@ -182,104 +182,6 @@ export default function AnalyticsPage() {
     improvementRate = secondAvg > 0 ? Math.round(((secondAvg - firstAvg) / firstAvg) * 100) : 0;
   }
 
-  /* ── Export Report ── */
-  const handleExportReport = useCallback(() => {
-    const subjectPerfData = subjectPerfQuery.data ?? [];
-    const categoryPerfData = categoryPerfQuery.data ?? [];
-    const insightsData = insightsQuery.data ?? [];
-    const scoreTrendData = scoreTrendQuery.data ?? [];
-
-    const categoryBreakdown = categoryPerfData
-      .map((c) => `  • ${c.category}: ${Math.round(c.score)}%`)
-      .join('\n');
-    const subjectBreakdown = subjectPerfData
-      .sort((a, b) => a.score - b.score)
-      .map((s) => `  • ${s.subject}: ${Math.round(s.score)}%`)
-      .join('\n');
-
-    // Compute trend inline to avoid declaration order issues
-    let trendSummary = 'Not enough data for trend analysis.';
-    if (scoreTrendData.length >= 2) {
-      const first = scoreTrendData[0].score;
-      const last = scoreTrendData[scoreTrendData.length - 1].score;
-      const diff = last - first;
-      if (diff > 0) trendSummary = `Your score has improved by ${diff.toFixed(1)} points over your journey. Keep going!`;
-      else if (diff < 0) trendSummary = `Your score decreased by ${Math.abs(diff).toFixed(1)} points. Focus on weak areas to bounce back.`;
-      else trendSummary = `Your score has remained consistent. Try pushing for a higher target.`;
-    }
-
-    const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Exam Analytics Report</title>
-<style>
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 800px; margin: 40px auto; color: #1a1a2e; background: #fafafa; padding: 20px; }
-  .header { background: linear-gradient(135deg, #059669, #0d9488); color: white; padding: 32px; border-radius: 16px; margin-bottom: 24px; }
-  .header h1 { margin: 0 0 4px 0; font-size: 28px; }
-  .header p { margin: 0; opacity: 0.9; font-size: 14px; }
-  .section { background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  .section h2 { margin: 0 0 16px 0; font-size: 18px; color: #059669; border-bottom: 2px solid #d1fae5; padding-bottom: 8px; }
-  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .stat-item { text-align: center; padding: 16px; background: #f0fdf4; border-radius: 10px; }
-  .stat-item .value { font-size: 28px; font-weight: 800; color: #059669; }
-  .stat-item .label { font-size: 12px; color: #6b7280; margin-top: 4px; }
-  .breakdown { line-height: 1.9; font-size: 14px; color: #374151; }
-  .trend-box { padding: 16px; border-radius: 10px; font-size: 14px; line-height: 1.6; }
-  .insight { padding: 12px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; margin-bottom: 8px; font-size: 13px; }
-  .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 24px; }
-</style></head><body>
-  <div class="header">
-    <h1>📊 Exam Analytics Report</h1>
-    <p>Generated on ${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-  </div>
-
-  <div class="section">
-    <h2>📈 Key Metrics</h2>
-    <div class="stats-grid">
-      <div class="stat-item"><div class="value">${totalExams}</div><div class="label">Total Exams</div></div>
-      <div class="stat-item"><div class="value">${avgScore}%</div><div class="label">Average Score</div></div>
-      <div class="stat-item"><div class="value">${totalExams > 0 ? Math.round((qualified / totalExams) * 100) : 0}%</div><div class="label">Pass Rate</div></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>📂 Category Breakdown</h2>
-    <div class="breakdown">${categoryBreakdown || '  No category data available.'}</div>
-  </div>
-
-  <div class="section">
-    <h2>📚 Subject Performance</h2>
-    <div class="breakdown">${subjectBreakdown || '  No subject data available.'}</div>
-  </div>
-
-  <div class="section">
-    <h2>📉 Trend Summary</h2>
-    <div class="trend-box" style="background: ${trendSummary.includes('improved') ? '#f0fdf4' : trendSummary.includes('decreased') ? '#fef2f2' : '#fffbeb'}; color: #374151;">
-      ${trendSummary}
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>💡 Insights</h2>
-    ${insightsData.length > 0 ? insightsData.map((i) => `<div class="insight">${i}</div>`).join('\n') : '<p style="color:#9ca3af;font-size:13px;">Add more exam data to generate insights.</p>'}
-  </div>
-
-  <div class="footer">
-    <p>Exam Journey Tracker · Analytics Report · ${new Date().toLocaleDateString('en-IN')}</p>
-  </div>
-</body></html>`;
-
-    const blob = new Blob([html], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `exam-analytics-report-${new Date().toISOString().split('T')[0]}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    toast.success('Report exported successfully!');
-  }, [totalExams, qualified, avgScore, scoreTrendQuery.data, subjectPerfQuery.data, categoryPerfQuery.data, insightsQuery.data]);
-
-  /* ── Trend message ── */
   const trendData = scoreTrendQuery.data ?? [];
   let trendMessage = '';
   if (trendData.length >= 2) {
@@ -320,15 +222,6 @@ export default function AnalyticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportReport}
-            className="border-emerald-200 bg-emerald-50/50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
-          >
-            <Download className="mr-1.5 size-4" />
-            Export Report
-          </Button>
           <div className="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
             {PERIODS.map((p) => (
               <button
@@ -802,68 +695,6 @@ export default function AnalyticsPage() {
         )}
       </div>
 
-      {/* ── AI Insights ── */}
-      {insightsQuery.isLoading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <SectionSkeleton key={i} lines={3} />
-          ))}
-        </div>
-      ) : (
-        <div>
-          <div className="mb-4 flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
-              <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <h2 className="text-base font-semibold text-foreground">AI Insights</h2>
-              <p className="text-xs text-muted-foreground">Personalized recommendations based on your exam data</p>
-            </div>
-          </div>
-          {insightsQuery.data && insightsQuery.data.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {insightsQuery.data.slice(0, 4).map((insight, idx) => {
-                const cfg = insightConfig[idx] || insightConfig[0];
-                const Icon = cfg.icon;
-                return (
-                  <Card
-                    key={idx}
-                    className={cn(
-                      'border-l-4 transition-all duration-200 hover:shadow-md hover:-translate-y-0.5',
-                      cfg.border,
-                    )}
-                  >
-                    <CardContent className="flex items-start gap-3 p-4">
-                      <div
-                        className={cn(
-                          'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg',
-                          cfg.bg,
-                        )}
-                      >
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {insight}
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <Card className="transition-shadow duration-200 hover:shadow-md">
-              <CardContent className="flex h-24 items-center justify-center">
-                <div className="text-center">
-                  <Lightbulb className="mx-auto mb-2 h-8 w-8 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">
-                    Add more exam data to generate AI insights.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
     </div>
   );
 }

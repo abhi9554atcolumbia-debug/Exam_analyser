@@ -100,11 +100,11 @@ import { DonutChart } from '@/components/charts/DonutChart';
 const CATEGORIES: { label: string; icon: React.ElementType; color: string; darkColor: string }[] = [
   { label: 'Scorecard', icon: FileCheck, color: 'text-emerald-600 bg-emerald-100', darkColor: 'dark:text-emerald-400 dark:bg-emerald-900/50' },
   { label: 'Admit Card', icon: FileSpreadsheet, color: 'text-blue-600 bg-blue-100', darkColor: 'dark:text-blue-400 dark:bg-blue-900/50' },
-  { label: 'Result', icon: FileText, color: 'text-teal-600 bg-teal-100', darkColor: 'dark:text-teal-400 dark:bg-teal-900/50' },
+  { label: 'Personal Docs', icon: FileText, color: 'text-teal-600 bg-teal-100', darkColor: 'dark:text-teal-400 dark:bg-teal-900/50' },
   { label: 'Question Paper', icon: FileText, color: 'text-amber-600 bg-amber-100', darkColor: 'dark:text-amber-400 dark:bg-amber-900/50' },
   { label: 'Answer Key', icon: FileKey, color: 'text-purple-600 bg-purple-100', darkColor: 'dark:text-purple-400 dark:bg-purple-900/50' },
   { label: 'Syllabus', icon: BookOpen, color: 'text-orange-600 bg-orange-100', darkColor: 'dark:text-orange-400 dark:bg-orange-900/50' },
-  { label: 'Notes', icon: StickyNote, color: 'text-rose-600 bg-rose-100', darkColor: 'dark:text-rose-400 dark:bg-rose-900/50' },
+  // { label: 'Notes', icon: StickyNote, color: 'text-rose-600 bg-rose-100', darkColor: 'dark:text-rose-400 dark:bg-rose-900/50' },
   { label: 'Misc', icon: Paperclip, color: 'text-slate-600 bg-slate-100', darkColor: 'dark:text-slate-400 dark:bg-slate-900/50' },
 ] as const;
 
@@ -819,43 +819,6 @@ export default function DocumentsPage() {
 
         {/* ── Sidebar ──────────────────────────────────── */}
         <div className="space-y-4">
-          {/* Category Distribution Donut */}
-          <Card className="transition-shadow duration-200 hover:shadow-md">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/50">
-                  <PieChart className="size-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                <div>
-                  <CardTitle className="text-sm font-semibold">Category Distribution</CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {donutData.length > 0 ? (
-                <>
-                  <DonutChart
-                    data={donutData}
-                    dataKey="value"
-                    nameKey="category"
-                    centerLabel="Docs"
-                    centerValue={donutData.reduce((a, c) => a + c.value, 0)}
-                    height={180}
-                  />
-                  <div className="mt-2 flex flex-wrap justify-center gap-2">
-                    {donutData.map((d) => (
-                      <div key={d.category} className="flex items-center gap-1.5 text-[11px]">
-                        <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-                        <span className="text-muted-foreground">{d.category}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <p className="py-4 text-center text-xs text-muted-foreground">No data yet</p>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Storage Overview */}
           <Card className="transition-shadow duration-200 hover:shadow-md">
@@ -882,43 +845,7 @@ export default function DocumentsPage() {
             </CardContent>
           </Card>
 
-          {/* Recent Uploads */}
-          <Card className="transition-shadow duration-200 hover:shadow-md">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/50">
-                  <Clock className="size-4 text-amber-600 dark:text-amber-400" />
-                </div>
-                <CardTitle className="text-sm font-semibold">Recent Uploads</CardTitle>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {stats?.recentUploads && stats.recentUploads.length > 0 ? (
-                <div className="space-y-3 max-h-48 overflow-y-auto">
-                  {stats.recentUploads.slice(0, 5).map((file, idx) => {
-                    const catCfg = getCategoryConfig('Notes'); // default
-                    return (
-                      <div key={idx} className="flex items-center gap-2.5">
-                        <div className={cn(
-                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted',
-                        )}>
-                          <File className="size-3.5 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-medium truncate">{file.name}</p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {formatFileSize(file.fileSize)} · {formatDate(file.createdAt)}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground text-center py-2">No recent uploads</p>
-              )}
-            </CardContent>
-          </Card>
+
 
           {/* Linked Exams */}
           <Card className="transition-shadow duration-200 hover:shadow-md">
@@ -960,7 +887,7 @@ export default function DocumentsPage() {
       <CreateDocumentDialog
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
-        onSuccess={() => {}}
+        onSuccess={() => { }}
       />
 
       {/* ── Delete Confirmation Dialog ── */}
